@@ -105,6 +105,8 @@ a question that is genuinely hard to answer by looking.
 
 | harness | the question it answers |
 |---|---|
+| `fps-bench.mjs` | Does it hold 60fps for a whole race — on desktop and on a throttled phone — and is the frame budget going to the CPU or the GPU? |
+| `fill-probe.mjs` | How many ms of the frame are PIXELS and how many are not? Fits ms/Mpx above the vsync clamp, where the signal is not pinned to the refresh rate. |
 | `drift-bench.mjs` | Is a drifting lap actually faster than a clean one, and does the mini-turbo ladder pay out? |
 | `tear-hunt.mjs` | Are any presented frames torn or partially rendered? |
 | `hitch-check.mjs` | Where are the frame-time spikes? |
@@ -114,6 +116,7 @@ a question that is genuinely hard to answer by looking.
 | `steer-test.mjs` | Does the kart go where the input says? |
 | `ai-health.mjs` | How often does the AI touch a wall? |
 | `touch-test.mjs`, `touch-lazy-test.mjs` | Do touch controls mount and steer, including when the browser lies about being a desktop? |
+| `touch-feel.mjs` | Are the touch controls any *good*? Input latency in ms and frames, the histogram of steer values a slow drag actually produces, three-plus-finger integrity under out-of-order releases, control size/reach across six devices, and whether anything triggers a browser gesture. |
 | `autoplay.mjs`, `shot.mjs` | Play a race unattended; capture frames. |
 
 Rules learned the hard way:
@@ -123,10 +126,53 @@ Rules learned the hard way:
   them — one projected a camera-relative vector as if it were a world point, and
   one had a frame-rate knob wired to nothing at all, which manufactured a "17×
   frame-rate dependence" that did not exist.
+- **A timing number from a software rasteriser is fiction.** Every harness here
+  passes `--enable-unsafe-swiftshader`, which is right when the question is
+  about correctness and wrong when it is about milliseconds: headless Chrome
+  falls back to SwiftShader silently and still returns confident numbers.
+  `fps-bench.mjs` omits that flag on purpose, reads `UNMASKED_RENDERER_WEBGL`
+  off the context the game actually rendered with, and hard-exits rather than
+  report a frame time it cannot attribute to a real GPU. Run
+  `node tools/fps-bench.mjs --force-software` to watch the refusal fire.
+- **At 60Hz there is no such thing as a 20ms frame.** vsync only ever hands back
+  ~16.7ms or ~33.4ms, so the *median* frame time of a build running at 48fps is
+  exactly 16.70 and reads as a perfect pass, and "% of frames over 16.7ms" is
+  ~45% on a flawless run purely from jitter. `fps-bench.mjs` gates on the MEAN
+  (which is 1000/fps by construction) and on frames that took two vsyncs. Do not
+  tidy either of those onto the obvious statistic.
 - **A screenshot cannot find a gameplay bug.** Inverted steering, unusable mobile
   controls and a pause menu that permanently ended your race all survived three
   full rounds of six reviewers scoring beautiful stills. If a change affects how
   the game *plays*, it needs a harness or a human, not a critic looking at a PNG.
+- **Measuring touch means measuring the browser too, and it lies in three
+  specific ways.** `touch-action` does not inherit, but its *effect* does — the
+  browser intersects it up the ancestor chain, so asserting `none` on a button
+  whose `html` already says `none` fails a correct page. Chrome does not
+  implement `-webkit-touch-callout` and DISCARDS the declaration at parse time,
+  so neither `getComputedStyle` nor the CSSOM can see it and both read as "the
+  CSS is missing". And Chrome coalesces `pointermove`s inside one frame, so a
+  125-step sweep returns 124 samples and the last one is not where you put it.
+  `touch-feel.mjs` failed the build for all three before any of them was real.
+  The fourth: `Kart.step` sets `steer = 0` while `stunTime > 0`, so an
+  unattended kart that finds a wall produces a 150 ms "input latency" hole that
+  the touch layer did not cause. Contaminated frames are dropped, not averaged.
+- **Pin the adaptive scaler for every A/B: `?scaler=off`, or `--scaler off`.**
+  The ladder in `main.ts` spends resolution to protect frame rate, which is
+  right for a player and ruinous for a measurement — an optimisation that
+  genuinely saves 2 ms lets the ladder hold a higher rung, so it draws *more
+  pixels* and reports the same fps. The saving is real and completely
+  invisible. Measured here: unpinned run-to-run spread is 8.65 ms, pinned it is
+  2.04 ms, and the two *slowest* unpinned runs are the two that walked down to
+  rung 0.5 — a quarter of the pixels, running slower than full resolution.
+  `__loopHealth().scalerPinned` reports whether the pin took; `fps-bench`
+  refuses to print a run that claims to be pinned and is not.
+- **Benchmark runs degrade this machine, so idle between them.** Four
+  consecutive `fps-bench` runs fell 59.9 → 58.4 → 53.4 → 39.4 fps with no code
+  change, and the game's own JS doubled (2.0 → 4.2 ms) across the sequence; a
+  120 s idle restored the next run to 57.6. Anything that sweeps must also
+  relaunch the browser per point — reusing one browser and opening a page per
+  point leaves a WebGL context and ~344 MB of textures alive each time, which
+  made `fill-probe`'s first draft report a *negative* fill slope.
 - **Draw calls are not proof of rendering.** All five known black-screen failure
   modes still issue a full frame's worth of draws into a canvas that is never
   painted. `Diagnostics.ts` samples the luma spread of the presented image

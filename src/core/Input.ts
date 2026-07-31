@@ -92,7 +92,7 @@ const RUMBLE_GAP = 0.055;
 
 export class Input implements IInput {
   state: InputState = {
-    steer: 0, accel: 0, brake: 0, drift: false, driftPressed: false,
+    steer: 0, accel: 0, brake: 0, accelAuto: false, drift: false, driftPressed: false,
     itemPressed: false, lookBack: false, pausePressed: false, anyPressed: false,
   };
   touch = false;
@@ -367,6 +367,7 @@ export class Input implements IInput {
     // --- keyboard -------------------------------------------------------------
     let digital = (has('ArrowRight', 'KeyD') ? 1 : 0) - (has('ArrowLeft', 'KeyA') ? 1 : 0);
     let accel = has('ArrowUp', 'KeyW') ? 1 : 0;
+    let accelAuto = false;
     let brake = has('ArrowDown', 'KeyS') ? 1 : 0;
     let drift = hit('ShiftLeft', 'ShiftRight');
     // Space fires items. It used to be a third accelerate binding, which wasted
@@ -394,6 +395,11 @@ export class Input implements IInput {
       // asking for straight-ahead RIGHT NOW, and should get it immediately
       // rather than coasting back through the digital return ramp.
       if (t.steering) analogue = t.steer;
+      // Sticky within the frame: a keyboard or gamepad throttle is a real
+      // decision and outranks the assist, so only claim `auto` if the assist
+      // is the ONLY thing asking for throttle.
+      if (t.accel > accel) accelAuto = t.autoAccel;
+      else if (t.accel > 0 && accel > 0 && !accelAuto) accelAuto = false;
       accel = Math.max(accel, t.accel);
       brake = Math.max(brake, t.brake);
       drift = drift || t.drift;
@@ -465,6 +471,7 @@ export class Input implements IInput {
     if (this.driftMin > 0) drift = true;
 
     s.accel = accel;
+    s.accelAuto = accelAuto;
     s.brake = brake;
     s.drift = drift;
     s.lookBack = look;

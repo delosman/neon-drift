@@ -60,6 +60,8 @@ export interface TouchState {
   steering: boolean;
   /** true while the player is actually touching something */
   active: boolean;
+  /** `accel` is the auto-accelerate assist's doing, not the player's */
+  autoAccel: boolean;
 }
 
 /**
@@ -99,6 +101,8 @@ export class TouchControls {
   readonly state: TouchState = {
     steer: 0, accel: 0, brake: 0, drift: false, item: false,
     look: false, pause: false, steering: false, active: false,
+    // whether `accel` above is the assist's doing rather than the player's
+    autoAccel: false,
   };
 
   /** auto-accelerate — the AUTO chip toggles it */
@@ -376,6 +380,9 @@ export class TouchControls {
     s.brake = this.bBrake.pointer >= 0 || this.bBrake.tapped ? 1 : 0;
     const gas = !this.auto && (this.bGas.pointer >= 0 || this.bGas.tapped);
     s.accel = this.auto ? (s.brake > 0 ? 0 : 1) : gas ? 1 : 0;
+    // Only the assist's throttle is flagged. With AUTO off the player is
+    // pressing GAS themselves, and the rocket start should count that.
+    s.autoAccel = this.auto && s.accel > 0;
     s.active = this.stickPointer >= 0 ||
       this.bDrift.pointer >= 0 || this.bItem.pointer >= 0 || this.bBrake.pointer >= 0 ||
       this.bLook.pointer >= 0 || this.bGas.pointer >= 0 ||

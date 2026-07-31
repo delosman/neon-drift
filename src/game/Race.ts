@@ -495,7 +495,17 @@ export class Race implements IRace {
       } else if (this.state === RaceState.Countdown) {
         // hold station, but watch the throttle for a rocket start
         if (k.isPlayer) {
-          if (input.accel > 0.5) p.hold += dt;
+          // `accelAuto` is the whole point of this condition. The rocket start
+          // reads a held throttle as a DECISION — hold briefly and you launch,
+          // hold too long and `armCountdown` burns you out with a spinOut. On
+          // touch, auto-accelerate is on by default and holds the throttle from
+          // the first frame of the countdown, so `hold` reached the full ~3 s,
+          // sailed past BURNOUT_WINDOW (1.75 s), and EVERY race on a phone
+          // opened with a guaranteed spin. With no steering input the spin
+          // direction is constant, so the kart came out of it pointing backwards
+          // and auto-accelerate obligingly drove it up the circuit the wrong
+          // way — which is exactly what it looked like from the sofa.
+          if (input.accel > 0.5 && !input.accelAuto) p.hold += dt;
           else p.hold = 0;
         }
         this.ai.drive(ctx, k, dt, this.karts, false);

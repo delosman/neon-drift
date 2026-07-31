@@ -120,6 +120,18 @@ export interface InputState {
   steer: number;
   /** 0..1 */
   accel: number;
+  /**
+   * True when `accel` is being supplied by the auto-accelerate assist rather
+   * than by the player asking for it.
+   *
+   * Anything that reads a held throttle as a DECISION has to know the
+   * difference. The rocket start does: holding through the countdown either
+   * boosts you off the line or, held too long, burns you out with a
+   * `spinOut`. Auto-accelerate is on by default on touch, so it held the
+   * throttle for the whole ~3 s countdown — past the 1.75 s burnout window —
+   * and every single race on a phone began with a guaranteed spin.
+   */
+  accelAuto: boolean;
   /** 0..1 */
   brake: number;
   /** held this frame */
