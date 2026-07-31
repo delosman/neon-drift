@@ -2889,6 +2889,19 @@ export class InstSet {
     if (this.useBob) attr(this.bobs, 4, 'aBob');
     mesh.castShadow = castShadow;
     mesh.receiveShadow = receiveShadow;
+    // NOTE: do NOT hang a `depthMaterialFor(this.mat)` here. It looks obviously
+    // right — a caster whose vertices are displaced in the colour material
+    // wants a depth material that displaces them identically — and it DELETES
+    // EVERY SCENERY SHADOW IN THE GAME. `patchLod` collapses an instance to a
+    // point beyond its LOD distance, and it measures that distance from the
+    // camera being rendered from. In the shadow pass that camera is the light's
+    // orthographic shadow camera, which sits far outside the circuit, so every
+    // instance reads as maximally distant, every one collapses, and the depth
+    // buffer comes back empty. Measured: mean luma of the start-line foreground
+    // went 43.3 -> 80.5 as the grandstand shadow over the bottom-left ~55% of
+    // the frame simply disappeared. If this is ever attempted again, the LOD
+    // uniform has to be fed the MAIN camera position explicitly rather than
+    // inheriting the shadow camera's.
     mesh.computeBoundingSphere();
     this.mats = [];
     this.cols = this.uvs = this.winds = this.lods = this.bobs = [];
@@ -2951,6 +2964,51 @@ const _mv = new THREE.Vector3();
  * saved. 150 m is a little over the length of circuit the chase camera can see
  * at once, so a typical frame touches two or three cells per material while the
  * 55 m shadow box usually touches one.
+ *
+ * ---------------------------------------------------------------------------
+ *  DO NOT EXTEND THIS GRID TO THE REST OF THE WORLD. IT HAS BEEN TRIED AND
+ *  MEASURED AND IT LOSES.
+ * ---------------------------------------------------------------------------
+ *  The obvious next step from here is to partition everything else the same
+ *  way, and it is very persuasive on paper: `village-walls` is 110 244
+ *  triangles inside a 363 m bounding sphere, `crowd0` is 116 250 inside a
+ *  356 m one, and the near shadow cascade is 110 m across, so neither can ever
+ *  be rejected by a frustum.
+ *
+ *  It was implemented — `GeoAccum` and `InstSet` both got a `buildCells`, every
+ *  circuit-spanning merge and every instance set above 60 instances was split
+ *  onto a 260 m grid — and measured with tools/perf.mjs at 1280x720. Draw calls
+ *  per frame, `typical` (non-cascade-refresh) column, before -> after:
+ *
+ *      hero   164 -> 226     grid  176 -> 272     boost  164 -> 301
+ *
+ *  against frame triangles of 3187k -> 3157k, 3284k -> 2922k, 3126k -> 2197k.
+ *
+ *  Sixty to a hundred and forty extra draw calls to save, at the hero vantage
+ *  point, THIRTY THOUSAND triangles. The reason is `patchLod`: distant
+ *  instances are already collapsed to a point in the vertex shader, in the
+ *  colour pass and in the depth pass alike, so the triangles a spatial split
+ *  would have culled were mostly costing nothing already. Culling also barely
+ *  fires — the aerial perspective reaches 600 m, so on this circuit the camera
+ *  frustum contains most of the cells most of the time and only rejects what is
+ *  behind you.
+ *
+ *  The batching above is worth it because it goes the OTHER way — it turns many
+ *  meshes into few. Splitting few into many is the same dial turned the wrong
+ *  direction.
+ *
+ *  Two notes on the instrument, since the numbers above were taken with it and
+ *  the next person will want to reproduce them:
+ *
+ *  - tools/perf.mjs draw counts are NOT exactly repeatable. The vantage point
+ *    is reached by simulation, not teleport, so the camera lands in a slightly
+ *    different place each run. Two consecutive runs of IDENTICAL code differed
+ *    by 10 draws at `pack` (157 vs 167) and 2-3 elsewhere. Deltas smaller than
+ *    about ten draws at a single vantage point are noise; the 60-140 above are
+ *    not.
+ *  - its `tris=` banner column is `last.triangles`, a single frame, not the
+ *    30-frame statistic the draw counts get. One run printed `tris=0k` for a
+ *    shot that plainly rendered. Read it as an order of magnitude.
  */
 const STATIC_CELL = 400;
 
@@ -3073,6 +3131,10 @@ export function mergeStaticSets(
     mesh.name = 'static-' + [...b.names].sort().join('+');
     mesh.castShadow = b.cast;
     mesh.receiveShadow = true;
+    // Same trap as `InstSet.build` above, and worse here: a baked cell is one
+    // mesh holding hundreds of props across a whole range of `aLod` distances,
+    // so a depth material carrying `patchLod` collapses the entire cell in the
+    // shadow pass. No `customDepthMaterial` here either.
     mesh.matrixAutoUpdate = false;
     merged.push(mesh);
   }
@@ -3152,6 +3214,73 @@ export function patch(mat: THREE.Material, key: string, fn: PatchFn) {
   e.keys.push(key);
   e.fns.push(fn);
   mat.needsUpdate = true;
+}
+
+/**
+ * The patches that MOVE VERTICES, as opposed to colouring them.
+ *
+ * Everything in this list changes where the geometry physically is — the LOD
+ * collapse, the wind sway, the boat bob, the crowd's cheer, cloth flap, a
+ * gull's orbit. Everything NOT in it (tint, instanced UV, translucency, aerial
+ * haze, roughness variation) only changes what the surface looks like, which a
+ * depth pass does not care about.
+ *
+ * Keys are matched by prefix because three of them are parameterised:
+ * `patchWind` keys as `wind0`/`wind1`, `patchCloth` as `cloth0.30`.
+ */
+const DEPTH_PATCH_KEY = /^(lod|wind\d|bob|crowd|cloth|bird)/;
+
+/**
+ * A depth material that agrees with `mat` about where its vertices are.
+ *
+ * THE BUG THIS FIXES. Every vertex displacement in this file lives in the
+ * colour material's `onBeforeCompile`. The shadow pass does not use the colour
+ * material: `WebGLShadowMap.getDepthMaterial` reaches for `customDepthMaterial`
+ * and falls back to one shared `MeshDepthMaterial` that knows nothing about any
+ * of it. So an object could be collapsed to a point by `patchLod` — invisible,
+ * deliberately, because it is 300 m away — and still lay a full-size shadow on
+ * the ground with nothing above it to cast it. Under this game's 14-degree key
+ * light that shadow is four times the prop's own height, so it is not a subtle
+ * artefact; it is a long dark streak attached to nothing.
+ *
+ * Measured with a per-instance distance probe over the four capture vantage
+ * points, 58-93% of all LOD-carrying world geometry is collapsed in the colour
+ * pass, and 493k-884k triangles of it were still being rasterised into the
+ * shadow map every frame — every spectator, every crate, every cypress on the
+ * far side of the circuit, at full detail, drawing shadows nobody can see.
+ *
+ * Foliage already solved this for its three cut-out sheets by hand (see
+ * `Foliage.buildSets`, which builds a matching `MeshDepthMaterial` and runs
+ * `patchWind` + `patchLod` over it). This generalises that to every set: the
+ * SAME patch closures are re-run against the depth material, so the two shaders
+ * cannot drift apart the way a hand-copied pair can.
+ *
+ * Returns null when `mat` moves no vertices — then three's shared depth
+ * material is already correct and a per-material clone would only cost a
+ * program.
+ *
+ * `map` / `alphaTest` / `side` are copied so the FIRST compile has the right
+ * defines. Three overwrites all three on every shadow draw regardless (it does
+ * this to custom depth materials too), so this changes no behaviour — it only
+ * stops the first shadow frame compiling a variant it immediately discards.
+ */
+export function depthMaterialFor(mat: THREE.Material): THREE.Material | null {
+  const e = PATCHES.get(mat);
+  if (!e) return null;
+  const wanted: number[] = [];
+  for (let i = 0; i < e.keys.length; i++) if (DEPTH_PATCH_KEY.test(e.keys[i])) wanted.push(i);
+  if (!wanted.length) return null;
+
+  const src = mat as THREE.MeshStandardMaterial;
+  const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  if (src.map && src.alphaTest > 0) {
+    d.map = src.map;
+    d.alphaTest = src.alphaTest;
+  }
+  if (src.alphaToCoverage) d.alphaToCoverage = true;
+  d.side = src.side;
+  for (const i of wanted) patch(d, e.keys[i], e.fns[i]);
+  return d;
 }
 
 const insertBefore = (src: string, token: string, code: string) => src.replace(token, code + '\n' + token);
