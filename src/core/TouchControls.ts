@@ -546,4 +546,13 @@ html[data-touch] .tc-top { left: calc(env(safe-area-inset-left, 0px) + 26vmin); 
   .tc-rotate b { font-size: 5.4vmin; letter-spacing: .04em; }
   .tc-stick-zone, .tc-cluster, .tc-top { display: none; }
 }
+
+/* A menu owns the screen — see the dataset.menu write in Menus.ts. Hide the
+   driving controls rather than leaving them live over a board the player is
+   reading. The pause screen is included deliberately: its whole purpose is that
+   the kart is not being driven.
+   (No backticks in this comment: the whole stylesheet is a template literal.) */
+html[data-menu] .tc-stick-zone,
+html[data-menu] .tc-cluster,
+html[data-menu] .tc-top { display: none; }
 `;

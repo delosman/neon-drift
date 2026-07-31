@@ -38,6 +38,40 @@ await cdp.send('Emulation.setEmitTouchEventsForMouse', { enabled: false });
 await page.goto(`http://127.0.0.1:${PORT}/?quality=medium`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction('window.__gameReady === true', { timeout: 90000 });
 
+// Get past the title screen before touching anything.
+//
+// This file used to drive straight from the title, which worked only because
+// the driving controls were drawn over every menu — the results board shipped
+// with a live DRIFT button across it. They are hidden on a menu screen now
+// (`html[data-menu]` in TouchControls.ts), so a tap aimed at the cluster while
+// the title is up correctly hits nothing, and this test was asserting against a
+// state no player is ever in. Start the race first, which is what a player does
+// and is the only state in which these controls are supposed to exist.
+//
+// The menu-hiding rule itself is asserted below rather than assumed, so this
+// setup cannot quietly paper over the controls failing to come BACK.
+const controlVis = () => page.evaluate(() => {
+  const c = document.querySelector('.tc-cluster');
+  const k = document.querySelector('.tc-stick-zone');
+  return {
+    menuAttr: document.documentElement.dataset.menu ?? null,
+    clusterVisible: !!c && getComputedStyle(c).display !== 'none',
+    stickVisible: !!k && getComputedStyle(k).display !== 'none',
+  };
+});
+
+// The title screen is up at this point, so this IS the over-a-menu case — no
+// URL forcing needed, and unlike `?ui=results` it can be left again.
+const overMenu = await controlVis();
+
+await page.evaluate(() => { window.__ctx.race.start(); });
+await page.waitForFunction(
+  () => !document.documentElement.dataset.menu &&
+        getComputedStyle(document.querySelector('.tc-cluster')).display !== 'none',
+  { timeout: 30000 },
+);
+const afterMenu = await controlVis();
+
 const touch = (type, points) =>
   cdp.send('Input.dispatchTouchEvent', {
     type,
@@ -93,6 +127,15 @@ await touch('touchEnd', []);
 await frames(20);
 results.released = await read();
 
+// --- the driving controls must VANISH on a menu and COME BACK after ----------
+// Captured around the title -> race transition at the top of this file. Both
+// halves matter: the results board shipped with a live DRIFT button drawn
+// across it, and hiding the controls is worthless if they never return.
+// `?ui=` is deliberately NOT used here — it FORCES a screen that `race.start()`
+// cannot clear, so a round trip through it can only ever prove half of this.
+results.overMenu = overMenu;
+results.afterMenu = afterMenu;
+
 console.log(JSON.stringify(results, null, 2));
 
 const ok =
@@ -101,7 +144,9 @@ const ok =
   results.dragRight.steer > 0.5 &&
   results.dragLeft.steer < -0.5 &&
   results.steerPlusDrift.drift === true && results.steerPlusDrift.steer > 0.5 &&
-  results.released.steer === 0 && results.released.drift === false;
+  results.released.steer === 0 && results.released.drift === false &&
+  !results.overMenu.clusterVisible && !results.overMenu.stickVisible &&
+  results.afterMenu.clusterVisible && results.afterMenu.menuAttr === null;
 
 console.log(ok ? '\nPASS — touch controls behave correctly' : '\nFAIL — see values above');
 await browser.close();

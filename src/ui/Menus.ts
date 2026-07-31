@@ -285,6 +285,20 @@ export class Menus {
     const pe = this.blocking ? 'auto' : 'none';
     this.root.style.pointerEvents = pe;
     if (want !== 'none') this.screens[want].style.pointerEvents = pe;
+
+    // Tell the touch layer a menu owns the screen. Without this the stick, the
+    // drift/brake cluster and the item button stay drawn over every menu — the
+    // results board shipped with a live DRIFT button on top of it and the item
+    // button sitting across the TOTAL row. Driving controls over a screen you
+    // cannot drive from are decoration at best and a mis-tap at worst.
+    //
+    // Signalled as an attribute rather than a direct call because `Menus` must
+    // not depend on `TouchControls`: the controls mount lazily, and on a
+    // browser that lies about being a desktop they may not exist yet when this
+    // first runs. CSS applies retroactively; a method call would have to be
+    // replayed. Same shape as the existing `html[data-touch]` HUD reflow.
+    if (want === 'none') delete document.documentElement.dataset.menu;
+    else document.documentElement.dataset.menu = want;
   }
 
   private selecting = false;

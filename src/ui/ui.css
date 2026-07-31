@@ -1905,3 +1905,108 @@ html[data-touch] .kr .kr-speed { --speed-s: 0.82; transform: scale(var(--speed-s
   color: rgba(255, 226, 174, 0.72);
   margin-bottom: 1vmin;
 }
+
+/* ===========================================================================
+ *  SHORT VIEWPORTS — a phone held in landscape, which is the only way this
+ *  game can be played on one.
+ * ===========================================================================
+ *
+ *  Everything above sizes with `vmin` and a `clamp()` floor, which is right on
+ *  a desktop and quietly wrong here. In landscape on a phone `vmin` is the
+ *  SHORT edge — 390px on an iPhone 14, 375px on an SE — so every one of those
+ *  clamps bottoms out at its minimum simultaneously, and the sum of the
+ *  minimums is taller than the screen. Before this block, measured at 844x390:
+ *
+ *      results   486px of content in 390px  — overflowed by 96px
+ *      pause     421px                      — overflowed by 31px
+ *      select    384px on a 375px SE        — overflowed by 9px
+ *
+ *  and on results BOTH BUTTONS sat entirely below the fold (tops at 387px and
+ *  431px), so a player who finished a race on a phone could not continue and
+ *  could not restart. The only responsive rule this file previously had for
+ *  these screens was `@media (max-aspect-ratio: 1/1)`, which matches PORTRAIT
+ *  and therefore never fires on the orientation the game actually runs in.
+ *
+ *  Two layers, and both earn their place:
+ *
+ *  1. The scroll clamp below is a SAFETY NET. It makes it structurally
+ *     impossible for a control to be unreachable on a viewport nobody thought
+ *     to test, including future ones. It is not the fix.
+ *  2. The compression is the fix — it stops the scroll from ever being needed
+ *     at the sizes that actually exist.
+ */
+
+.kr-screen > .kr-screen-in {
+  max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* `body` sets `touch-action: none` so the game surface cannot be pinched or
+     panned. A scroller nested inside that has to opt back in explicitly or a
+     thumb drag does nothing at all — the content is reachable in the layout
+     and unreachable with a finger, which is the worse failure of the two. */
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+.kr-screen > .kr-screen-in::-webkit-scrollbar { display: none; }
+
+@media (max-height: 520px) {
+  .kr-screen > .kr-screen-in {
+    width: min(150vmin, 97vw);
+    /* the vertical safe padding is the single largest fixed cost on a screen
+       this short; the horizontal one keeps its full value because width is the
+       axis we have plenty of */
+    padding-top: calc(var(--safe) * 0.42 + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--safe) * 0.42 + env(safe-area-inset-bottom, 0px));
+  }
+
+  .kr-title { font-size: clamp(15px, 4.4vmin, 30px); letter-spacing: 0.1em; }
+  .kr-sub { font-size: clamp(9px, 1.6vmin, 14px); }
+
+  /* Eight racers on one row instead of two. 844px of width divided eight ways
+     is a narrower card than the desktop layout wants, but width is exactly what
+     a landscape phone has spare, and it removes a whole card's height. */
+  .kr-roster { margin-top: 1.1vmin; grid-template-columns: repeat(8, 1fr); gap: clamp(4px, 0.9vmin, 10px); }
+  .kr-card { padding: clamp(4px, 0.9vmin, 10px); }
+  .kr-card-chip { height: clamp(20px, 4.4vmin, 34px); }
+  .kr-card-name { font-size: clamp(8px, 1.4vmin, 13px); }
+  /* Eight-up makes each card ~87px wide, and at that width the `3.4em` label
+     column consumed the row and left the bar with nothing — the card showed
+     SPEED / ACCEL / HANDLING / WEIGHT as four words with no bars beside them,
+     which is strictly less information than the bars alone. Drop the words and
+     let each bar have the full width: length and colour still say everything
+     the row was there to say, and the labels are in the same order on every
+     card so the position carries the meaning. */
+  .kr-stats { margin-top: 0.5vmin; gap: 0.34vmin; }
+  .kr-stat { grid-template-columns: 1fr; gap: 0; }
+  .kr-stat span { display: none; }
+  .kr-bar { height: clamp(3px, 0.9vmin, 7px); }
+
+  /* Results and pause are standings-driven: eight rows are the bulk of the
+     height, so the row is where the saving has to come from. */
+  .kr-standings { gap: 0.3vmin; }
+  .kr-row { padding: 0.28em 0.7em 0.3em; gap: 0.6em; }
+  .kr-row-p { font-size: clamp(11px, 2vmin, 18px); }
+
+  .kr-menu-list { margin-top: 1.1vmin; gap: 0.6vmin; width: min(52vmin, 62vw); }
+  .kr-btn { padding: 0.46em 1.1em 0.5em; font-size: clamp(11px, 2vmin, 17px); }
+
+  /* Both of these are two-column on a wide screen and collapse to one column
+     in the PORTRAIT rule above. In landscape they must stay two-up: side by
+     side is how the height gets paid for. */
+  .kr-results-grid, .kr-pause-grid { grid-template-columns: 1.15fr 1fr; }
+
+  /* The staged entrance translates children downward from 3.2vmin before
+     settling. On a screen with no spare height that briefly pushes the bottom
+     control off the end, so the travel is cut rather than the animation. */
+  .kr-screen.on .kr-stage { animation-duration: 0.5s; }
+}
+
+/* Very short — a small phone in landscape with browser chrome showing. */
+@media (max-height: 400px) {
+  .kr-title { font-size: clamp(13px, 3.8vmin, 22px); }
+  .kr-card-chip { height: clamp(16px, 3.6vmin, 26px); }
+  .kr-row { padding: 0.2em 0.6em 0.22em; }
+  .kr-btn { padding: 0.38em 1em 0.42em; }
+  .kr-roster { margin-top: 0.7vmin; }
+  .kr-menu-list { margin-top: 0.7vmin; }
+}
