@@ -284,7 +284,15 @@ export class Menus {
     // to 'none' the moment the screen clears keeps the canvas clickable.
     const pe = this.blocking ? 'auto' : 'none';
     this.root.style.pointerEvents = pe;
-    if (want !== 'none') this.screens[want].style.pointerEvents = pe;
+    // Clear the OUTGOING screen too. This used to only ever set the incoming
+    // one, so a screen that had been shown kept `pointer-events: auto` as an
+    // inline style — which outranks any stylesheet — for the rest of the
+    // session. Every `.kr-screen` stays displayed, so the title screen sat over
+    // the race as a live, invisible pointer target from the first frame on.
+    for (const name of Object.keys(this.screens) as ScreenName[]) {
+      const el = this.screens[name];
+      if (el) el.style.pointerEvents = name === want ? pe : 'none';
+    }
 
     // Tell the touch layer a menu owns the screen. Without this the stick, the
     // drift/brake cluster and the item button stay drawn over every menu — the

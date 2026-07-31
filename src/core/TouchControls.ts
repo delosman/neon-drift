@@ -526,6 +526,51 @@ html[data-touch] .kr-speed {
   right: 47vmin;
   transform: scale(.82);   /* transform-origin is already 100% 100% */
 }
+
+/* ---- LEFT IS READOUTS, RIGHT IS CONTROLS -----------------------------------
+   The rule above anchors the speedometer to the action cluster rather than to
+   an edge, and on a phone that is not a corner: 47vmin of a 390px-tall
+   landscape screen is 183px, which on an 844px-wide panel puts the dial at
+   about 70% across — floating in open space between the cluster and the middle
+   of the frame, directly in the sightline down the road. Reported from play as
+   "the speedometer is basically in the middle of the screen", and it is.
+
+   Rather than nudge it, the bottom rail gets a rule: every glanceable readout
+   lives on the LEFT, every control on the RIGHT. So the dial goes next to the
+   item box on the left rail, the right half belongs entirely to the thumb, and
+   the centre of the screen — the part you actually drive by looking at — is
+   left empty.
+
+   Only on a genuinely short viewport. A tablet in landscape has the height for
+   the original layout and the corners are much further apart. */
+@media (max-height: 520px) {
+  html[data-touch] .kr-speed {
+    /* flush against the item box, both on the left rail */
+    left: calc(var(--rail) + 1.4vmin);
+    right: auto;
+    transform-origin: 0 100%;
+    transform: scale(.74);
+  }
+  /* The rail is clamp(84px, 14.5vmin, 208px), and at 390px of height 14.5vmin
+     is 56px — so it pins to its 84px FLOOR and eats 22% of the screen height
+     for two readouts. Same clamp-floor problem as the menus.
+     (No backticks anywhere in this stylesheet: it is a template literal.) */
+  html[data-touch] .kr { --rail: 68px; --rail-top: 46px; }
+
+  /* The position plate is the largest single object left, and it sits at
+     left-centre — across the road, at eye height. Its width is
+     clamp(176px, 24vmin, 348px), and 24vmin here is 94px, so it pins to the
+     176px floor: a fifth of the screen width for a placing and one rival's
+     gap. Scaled rather than re-laid-out, because the plate is deliberately a
+     FIXED width (see ui.css) so the delta changing between "+1.08" and
+     "+12.48" cannot make it resize sixty times a second, and re-deriving that
+     width per breakpoint would just be the same decision made twice.
+     The existing translateY(-50%) has to survive: it is what centres it. */
+  html[data-touch] .kr-pos {
+    transform: translateY(-50%) scale(.68);
+    transform-origin: 0 50%;
+  }
+}
 /* DEAD RULE REMOVED (round 10). This block repositioned '.kr-board', the
    eight-row standings tower that used to sit right-centre. Round 8 deleted
    that element — the in-race order is now one rival row inside the position

@@ -1936,7 +1936,17 @@ html[data-touch] .kr .kr-speed { --speed-s: 0.82; transform: scale(var(--speed-s
  *     at the sizes that actually exist.
  */
 
-.kr-screen > .kr-screen-in {
+/* `.on` IS LOAD-BEARING HERE. Every `.kr-screen` stays in the DOM and stays
+   displayed; only `.on` marks the active one. Scoping this to `.kr-screen`
+   alone made EVERY inactive screen a full-viewport scroller with
+   `touch-action: pan-y`, and the title screen also keeps a stale inline
+   `pointer-events: auto` from the last time it was shown. On a real phone the
+   browser arbitrates a pan gesture on that scroller before the page ever sees
+   the touch, so DRIFT and the item button stopped responding mid-race. Every
+   harness still passed, because CDP-dispatched touch events bypass gesture
+   arbitration — the bug is invisible to synthetic input and obvious to a
+   thumb. */
+.kr-screen.on > .kr-screen-in {
   max-height: 100dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1947,10 +1957,10 @@ html[data-touch] .kr .kr-speed { --speed-s: 0.82; transform: scale(var(--speed-s
   touch-action: pan-y;
   scrollbar-width: none;
 }
-.kr-screen > .kr-screen-in::-webkit-scrollbar { display: none; }
+.kr-screen.on > .kr-screen-in::-webkit-scrollbar { display: none; }
 
 @media (max-height: 520px) {
-  .kr-screen > .kr-screen-in {
+  .kr-screen.on > .kr-screen-in {
     width: min(150vmin, 97vw);
     /* the vertical safe padding is the single largest fixed cost on a screen
        this short; the horizontal one keeps its full value because width is the
