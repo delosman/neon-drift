@@ -9,6 +9,32 @@
          with the gesture handlers in src/core/Input.ts. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Kart Royale</title>
+
+    <!-- Add to Home Screen, which on a phone is worth more than it sounds.
+         Safari's toolbar and tab strip occupy roughly the top 220px of a
+         landscape phone — about a quarter of the vertical space, in a game that
+         is already short of height and whose menus had to be rebuilt to fit
+         what was left. Launched from the home screen these tags drop the chrome
+         entirely and the game gets the whole panel.
+
+         `black-translucent` puts the status bar over the canvas rather than
+         above it, which is what we want given `viewport-fit=cover` and the
+         `env(safe-area-inset-*)` padding already in the HUD and menu CSS.
+
+         The deprecated apple-prefixed name is kept alongside the standard one:
+         iOS honours the former and nothing else reads it, while the standard
+         `mobile-web-app-capable` is what every other engine looks for. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Kart Royale" />
+    <meta name="theme-color" content="#05070d" />
+    <meta name="description" content="A kart racer with no art assets — every texture, mesh and sound generated in code." />
+    <!-- No `apple-touch-icon`, deliberately. An icon would be the first and only
+         art asset in the repository, and iOS falls back to a snapshot of the
+         page, which is a procedurally generated image of the game — exactly the
+         right icon for this project and one that costs nothing. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
