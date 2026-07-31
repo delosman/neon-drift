@@ -124,10 +124,15 @@ const shaderErrors: string[] = [];
 const failedMaterials = new Set<string>();
 
 /**
- * The PBR family the entire world is built from. A driver that rejects it
- * leaves every road, wall, building and kart invisible while the sky — which is
- * a raw ShaderMaterial and does not go through these chunks — keeps drawing.
- * That is precisely the reported screenshot, and it is the leading theory.
+ * three's own type names, for the one path that only ever sees text: the
+ * `console.error` interception below, which catches shader failures raised
+ * before the renderer's hook exists (postprocessing's own materials, and
+ * anything compiled during a context restore).
+ *
+ * It is deliberately NOT how the main path classifies a failure. Every world
+ * material in this game carries a custom name, so a test for three's type names
+ * matches none of them; the renderer sniffs the fragment source for the
+ * lighting chunks instead and tells us the answer. See `describeProgram`.
  */
 const WORLD_MATERIAL = /Mesh(Standard|Physical|Lambert|Phong|Toon)Material/;
 
@@ -136,12 +141,14 @@ const WORLD_MATERIAL = /Mesh(Standard|Physical|Lambert|Phong|Toon)Material/;
  * driver's real info log. Setting that hook SUPPRESSES three's default
  * `console.error`, so this is now the only place the text exists — it must
  * record and re-emit both.
+ *
+ * `isWorldMaterial` is the renderer's verdict on whether the failing program
+ * was one of the lit families the visible world is built from. A rejected
+ * post-processing effect costs a look; a rejected lit material costs the world.
  */
-export function recordShaderError(text: string, materialType: string): void {
+export function recordShaderError(text: string, label: string, isWorldMaterial: boolean): void {
   if (shaderErrors.length < 40) shaderErrors.push(text.slice(0, 900));
-  if (WORLD_MATERIAL.test(materialType) || WORLD_MATERIAL.test(text)) {
-    failedMaterials.add(materialType || 'unknown');
-  }
+  if (isWorldMaterial) failedMaterials.add(label);
 }
 
 export function worldMaterialsFailed(): number {
@@ -221,6 +228,7 @@ export class Diagnostics {
   private cleanStreak = 0;
   private lastSample: FrameSample | null = null;
   private materialsEscalated = false;
+  private singleShaderNoted = false;
   /** frame number before which a fresh degrade is given time to take effect */
   private settleUntil = 0;
 
@@ -272,11 +280,25 @@ export class Diagnostics {
 
   // -- detector 1: a material family the world is made of failed to link -----
   private checkShaders(ctx: Ctx): boolean {
-    if (this.materialsEscalated || failedMaterials.size === 0) return false;
+    if (this.materialsEscalated) return false;
+    const n = failedMaterials.size;
+    if (n === 0) return false;
+    if (n === 1) {
+      // ONE failure is not evidence of a systemic one, and the remedy — every
+      // material in the game replaced with an untextured variant — is far too
+      // expensive to spend on a single prop's shader. Say so once, in the
+      // report, and leave the picture alone. The boot trial is what catches the
+      // systemic case, and it catches it before the world is even built.
+      if (!this.singleShaderNoted) {
+        this.singleShaderNoted = true;
+        logPipeline('shader-error', `one material failed to compile (${Array.from(failedMaterials)[0]}); ` +
+          'not enough to be systemic, so the pipeline is left alone — expect that object to be missing');
+      }
+      return false;
+    }
     this.materialsEscalated = true;
     const names = Array.from(failedMaterials).join(', ');
-    const why = `${failedMaterials.size} world material famil${failedMaterials.size === 1 ? 'y' : 'ies'} ` +
-      `failed to compile on this GPU (${names})`;
+    const why = `${n} world material families failed to compile on this GPU (${names})`;
     logPipeline('shader-error', why);
     const p = pipeline();
     if (p !== null && p.degradeToSafeMaterials(why)) {

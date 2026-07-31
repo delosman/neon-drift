@@ -331,6 +331,7 @@ class Rings {
       side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geo, this.material);
+    this.mesh.name = 'fx-rings';
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.renderOrder = 12;
@@ -477,6 +478,7 @@ class Motes {
       blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geo, this.material);
+    this.mesh.name = 'fx-motes';
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.renderOrder = 13;
@@ -611,6 +613,7 @@ class Gulls {
       side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geo, this.material);
+    this.mesh.name = 'fx-gulls';
     this.mesh.matrixAutoUpdate = false;
     // A startled bird flies up to ~20 m clear of its orbit; the bounding sphere
     // above is 400 m around the colony, so the flush stays inside it and the
@@ -703,6 +706,7 @@ class Shimmer {
       side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(g, this.material);
+    this.mesh.name = 'fx-shimmer';
     this.mesh.renderOrder = 13;
     this.mesh.frustumCulled = false;
   }
@@ -981,6 +985,7 @@ class Plumes {
     });
 
     this.mesh = new THREE.Mesh(this.geo, this.material);
+    this.mesh.name = 'fx-plumes';
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.renderOrder = 12;
@@ -1304,6 +1309,11 @@ export class Effects implements System {
     }
 
     this.group.matrixAutoUpdate = false;
+    // Named so tools/perf.mjs can attribute this subtree. It was anonymous, and
+    // `perf-report.mjs` classifies on the name, so six of the eight FX meshes
+    // (rings, plumes, motes, gulls, shimmer, trails) were being filed under
+    // `other:Group` and the FX row read 3 draws when it was really 9.
+    this.group.name = 'fx';
     ctx.scene.add(this.group);
 
     this.unsubscribe = ctx.bus.on(this.onEvent);

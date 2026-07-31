@@ -277,6 +277,10 @@ function warmShadowDepth(ctx: Ctx): void {
   const passThrough = host.renderBufferDirect;
   const prevAutoUpdate = shadowMap.autoUpdate;
   const warmed = new Set<THREE.Material>();
+  // Which programs already existed. Only the ones this pass ADDS need pinning —
+  // see the note below on why pinning all of them is a leak rather than
+  // belt-and-braces.
+  const preExisting = new Set<unknown>(renderer.info.programs ?? []);
 
   host.renderBufferDirect = function (camera, scene, geometry, material, object, group) {
     // See (3) above: without this, one program serves every caster.
@@ -298,7 +302,22 @@ function warmShadowDepth(ctx: Ctx): void {
     for (const o of notCasting) o.castShadow = false;
     // Hold on to every variant just built. `releaseProgram` deletes at zero, and
     // a shared depth material only ever points at its most recent one.
+    //
+    // ONLY THE ONES THIS PASS BUILT. This used to walk the whole cache and
+    // increment everything, which pins the ~120 COLOUR programs too — and those
+    // are not orphans in need of a reference, they are already held by the
+    // materials that own them. The extra count is never released by anything,
+    // so a program whose material is later disposed (a quality change, an
+    // effect-chain rebuild, a scenery set torn down) can never reach zero and
+    // its GL object stays resident for the life of the context. Depth programs
+    // are the only ones with no owner to hold them, because three mutates one
+    // shared `_depthMaterial` across every caster; those still get their pin.
+    //
+    // Measured at Ultra: 99 programs pinned -> 20, which is exactly the 20 the
+    // pass reports as `depth=+20`. At Quality.Low it is 0 either way — shadows
+    // are off there and this whole function returns before it starts.
     for (const p of renderer.info.programs ?? []) {
+      if (preExisting.has(p)) continue;
       const prog = p as unknown as { usedTimes: number };
       if (typeof prog.usedTimes === 'number') prog.usedTimes++;
     }

@@ -181,9 +181,14 @@ export class Trails {
     });
 
     this.mesh = new THREE.Mesh(this.geo, this.material);
+    this.mesh.name = 'fx-trails';
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.renderOrder = 11;
+    // Nothing is live at construction, and `update` owns this from here on.
+    // See the live-window note there: an idle pool must issue no draw at all.
+    this.mesh.visible = false;
+    this.geo.setDrawRange(0, 0);
 
     for (let i = 0; i < capacity; i++) {
       this.slots.push({
@@ -324,6 +329,21 @@ export class Trails {
   }
 
   update(dt: number) {
+    // Live window over the slot ring, in the same spirit as the ones Rings,
+    // Plumes, Particles and Decals already keep — this pool was the only one
+    // without it, and it is the only one whose geometry is NOT instanced, so
+    // there was no `instanceCount = 0` to fall back on. The mesh is
+    // `frustumCulled = false` with a 1e6 bounding sphere, so a pool with
+    // nothing in it still issued a real drawElements of every slot: 832
+    // vertices and 800 degenerate triangles through an additive, double-sided,
+    // depth-write-off state, on every frame of the race.
+    //
+    // Trails are boost plumes and shell wakes. They are absent for most of a
+    // lap and, when present, occupy the first slot or two — `acquire` scans
+    // from zero — so a span rather than a flag is worth the two comparisons:
+    // the live boost ribbon draws 50 triangles instead of 800.
+    let live = -1;
+    let first = -1;
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i];
       if (s.dying) {
@@ -334,7 +354,21 @@ export class Trails {
         this.rebuild(i);
         s.dirty = false;
       }
+      if (s.active || s.dying) { if (first < 0) first = i; live = i; }
     }
+
+    // A slot that has just finished dying was cleared to degenerate vertices
+    // above, so shrinking the window past it cannot leave stale geometry on
+    // screen — the clear and the range collapse in the same frame.
+    const perSlot = (SEG - 1) * 6;
+    if (first < 0) {
+      this.mesh.visible = false;
+      this.geo.setDrawRange(0, 0);
+    } else {
+      this.mesh.visible = true;
+      this.geo.setDrawRange(first * perSlot, (live - first + 1) * perSlot);
+    }
+
     if (this.hi >= this.lo) {
       const per = SEG * 2 * VSTRIDE;
       this.buffer.clearUpdateRanges();

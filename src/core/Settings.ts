@@ -435,6 +435,26 @@ function detectQuality(dev: DeviceProfile): Quality {
  * past the pixel density, so every one of those texels is resolved by a mip
  * the hardware builds and then never samples the top of. 256² is the honest
  * number there, and it is the difference between a game and a crash.
+ *
+ * RE-DERIVED FOR THE SHARPER HANDHELD BUFFER. The Low tier now renders at
+ * 1.51x CSS instead of 0.70x, so the pixel density it has to keep up with went
+ * up 2.2x in each axis and the argument above has to be re-run rather than
+ * assumed. It survives: 256² over a 3.5 m tile is 73 texels/m, and a 589-px-
+ * wide buffer looking down a road ~8 m wide resolves ~74 px/m at the kart and
+ * far fewer beyond it, so the top mip is now roughly AT the sampling rate
+ * instead of ten times past it. That is the right place to be, and there is no
+ * room to go further anyway. Measured with `?texcap=` on the 390x844 profile:
+ *
+ *     256 -> 36.0 MB     384 -> 37.6 MB     512 -> 83.5 MB
+ *
+ * against the mobile soak's 80 MB budget, so 512 is out. 384 looks nearly free
+ * and is a trap: `setTextureBudget` SLICES a hand-built mip chain rather than
+ * resampling it (see Textures.ts, which is why the foliage alpha coverage and
+ * the kart lacquer roughness chain survive the cap at all), and a slice can
+ * only ever halve. A non-power-of-two cap is therefore honoured by the
+ * resampling path and rounded down to 256 by the slicing path — which is why
+ * it buys 1.6 MB instead of the ~2.25x it looks like it should. Half a cap is
+ * worse than either whole one.
  */
 const TEXTURE_CAP: Record<Quality, number> = {
   [Quality.Low]: 256,
@@ -445,12 +465,47 @@ const TEXTURE_CAP: Record<Quality, number> = {
 
 const PRESETS: Record<Quality, Omit<Settings, 'quality' | 'masterVolume'>> = {
   [Quality.Low]: {
-    // A phone at devicePixelRatio 3 rendering at renderScale 1 is drawing nine
-    // times the pixels of its own CSS layout. Capping the ratio at 1 and taking
-    // another 30% off is the single cheapest frame-time and bandwidth win on the
-    // device, and at this panel size it is very hard to see.
-    maxPixelRatio: 1, shadows: false, ssao: false, bloom: true, motionBlur: false,
-    dof: false, renderScale: 0.7, volumetrics: false, reflections: false,
+    // ---------------------------------------------------------------------
+    //  THE PHONE TIER USED TO CUT RESOLUTION TWICE, AND THE SECOND CUT WENT
+    //  BELOW THE PANEL'S OWN RESOLUTION.
+    // ---------------------------------------------------------------------
+    //  This shipped `maxPixelRatio: 1, renderScale: 0.7`. Those are two
+    //  independent knobs on the same quantity and they MULTIPLY: measured on a
+    //  390x844 panel at devicePixelRatio 3 the drawing buffer came out
+    //  273x590 — 0.16 Mpx, which is 0.70x the page's own CSS resolution in
+    //  each axis. Below 1.0 the compositor is UPSCALING on present, so every
+    //  edge in the frame is resampled and every glyph in the HUD is soft. That
+    //  is the "visibly soft on a real phone" this round exists to remove, and
+    //  it was never a measured trade — it was two guesses stacked.
+    //
+    //  Worse, a third ceiling was already sitting underneath both of them and
+    //  never firing: PIXEL_BUDGET_MPX[Low] is 1.2 Mpx, and a phone at ratio 1
+    //  draws 0.33. The tier had three resolution policies, two of them binding
+    //  and the honest one inert. That is the "one global constant applied
+    //  uniformly to things that are not uniform" trap in CLAUDE.md, twice.
+    //
+    //  So resolution on this tier is now ONE policy: the pixel budget, which
+    //  is expressed in the unit the cost actually scales with. `renderScale`
+    //  goes back to 1 and is reserved for `?scale=` (a harness knob that
+    //  rebuilds the whole effect chain, which is right for a pinned sweep and
+    //  wrong for a shipping tier), and `maxPixelRatio` goes to 2 so the budget
+    //  — not an arbitrary cap — is what decides.
+    //
+    //  Measured on the 390x844/dpr-3 profile: 273x590 = 0.16 Mpx at 0.70x CSS
+    //  becomes 589x1275 = 0.75 Mpx at 1.51x CSS. 4.6x the pixels, and the
+    //  buffer is now ABOVE the panel's own resolution instead of below it, so
+    //  nothing is upscaled at all. The ladder in main.ts may still walk it
+    //  down under load, but its floor on a handheld is 1.0x CSS — the softness
+    //  is now the bottom of a measured range instead of the starting point.
+    //
+    //  Everything else here is unchanged. Shadows in particular stay OFF: the
+    //  cascade sizes live in Sky.ts and are 2048+2048 = 8.4 Mpx below
+    //  Quality.High, which against a 0.75 Mpx screen is eleven times the
+    //  frame's own pixel count. A phone tier with shadows needs the cascades
+    //  sized to the tier first; that is a render-side change, not a settings
+    //  one, and it is the largest remaining quality gap on this tier.
+    maxPixelRatio: 2, shadows: false, ssao: false, bloom: true, motionBlur: false,
+    dof: false, renderScale: 1, volumetrics: false, reflections: false,
     particleDensity: 0.35, foliageDensity: 0.3,
   },
   [Quality.Medium]: {
@@ -469,6 +524,134 @@ const PRESETS: Record<Quality, Omit<Settings, 'quality' | 'masterVolume'>> = {
     particleDensity: 1.4, foliageDensity: 1.35,
   },
 };
+
+/**
+ * ===========================================================================
+ *  A PIXEL RATIO IS NOT A BUDGET. A PIXEL COUNT IS.
+ * ===========================================================================
+ *  `maxPixelRatio: 2` says "up to two drawing-buffer pixels per CSS pixel per
+ *  axis" and says nothing whatsoever about how many pixels that is. The two
+ *  desktop tiers ship it, and every per-sample cost in the frame — the whole
+ *  post chain, which measures at roughly half of it — scales with the product,
+ *  not the ratio. So the same setting means:
+ *
+ *      1920x1080 monitor, dpr 1   ->  2.07 Mpx   (measured 45.6 fps)
+ *      1512x982 retina Mac, dpr 2 ->  5.94 Mpx   (measured ~15 fps at 8.29)
+ *
+ *  Four times the work for the same nominal quality setting, on the machine
+ *  this game is developed on. That is not a tuning miss, it is the unit being
+ *  wrong.
+ *
+ *  The adaptive ladder in main.ts cannot rescue it either: `setDynamicScale`
+ *  clamps at 0.5, which is a quarter of the pixels, so from 5.94 Mpx the
+ *  bottom rung is 1.49 Mpx and 60 fps is simply not reachable from that start.
+ *  The ceiling is what puts the ladder within reach of its own target.
+ *
+ *  Expressed as drawing-buffer megapixels and FLOORED AT RATIO 1, which is the
+ *  important half of the rule:
+ *
+ *   - On a dpr-1 display it is inert. A 1080p monitor and a 4K monitor both
+ *     keep ratio 1 and every pixel of the panel, exactly as before; a 4K
+ *     monitor that cannot afford 8.29 Mpx is the LADDER's problem, because that
+ *     is a reversible, measured decision and this one is a guess made at boot.
+ *   - On a dpr-2 panel it trades supersampling, and only supersampling. At the
+ *     Ultra ceiling a 1512x982 retina window renders at ratio 1.42 — still
+ *     above the panel's CSS resolution, so nothing is being upscaled — instead
+ *     of 2.0. Half the fill cost for a difference that needs a loupe, against
+ *     an alternative of 15 fps.
+ *
+ *  THIS IS THE ONLY RESOLUTION POLICY IN THE PROGRAM, AND THAT IS DELIBERATE.
+ *  There are two other pixel ceilings in the tree and both must stay inert:
+ *
+ *    - `Renderer.effectivePixelRatio()` carries a 4.0 Mpx BACKSTOP. Every
+ *      budget below is far under it, so on any path this function controls the
+ *      backstop can never bind — it exists for a `?scale=` sweep or a settings
+ *      object that never came through here. Two live ceilings on one quantity
+ *      is the CLAUDE.md trap; one live ceiling and one documented backstop is
+ *      not. `assertBackstopClearance()` below fails loudly if that ordering is
+ *      ever broken by a future edit to either file.
+ *    - A tier's `renderScale`. It is now 1 on every tier and reserved for
+ *      `?scale=`, because it is part of `pipelineSignature` (changing it tears
+ *      down and rebuilds the whole effect chain) and because multiplying it by
+ *      the ladder's rungs compounds two independent budgets — which is exactly
+ *      what produced the phone's 0.70x-CSS buffer.
+ *
+ *  The numbers were "deliberately generous rather than fitted" and that was the
+ *  right call while nothing had been measured on a quiet machine. It has been
+ *  now, twice and independently, and both fits agree:
+ *
+ *      frame_ms = 6.25 + 5.30 * Mpx      (7 points, fps-bench)
+ *      frame_ms = 9.51 + 3.91 * Mpx      (4 points, fill-probe)
+ *
+ *  Both put 16.7 ms at 1.8-2.0 Mpx on this build at Ultra, and both validate
+ *  against the 1080p point held out of the fit (2.07 Mpx, measured 16.67-17.20
+ *  ms). A 3.0 Mpx Ultra budget was therefore asking a retina window for ~50%
+ *  more pixels than the frame has ever been able to afford, which is not
+ *  generosity, it is a guaranteed miss.
+ *
+ *  The budgets below sit ABOVE the fitted number rather than on it — the post
+ *  chain and the shadow cascades are being worked on in parallel and a budget
+ *  fitted to today's cost would over-cut the moment they get cheaper — but no
+ *  longer 50% above it. Every one is a strict reduction except Low, which goes
+ *  the other way on purpose. See the Low preset.
+ *
+ *  Measured deltas at the four profiles the tier probe covers:
+ *
+ *    1920x1080 dpr 1  Ultra   1920x1080 2.07 Mpx  ->  unchanged (inert at dpr 1)
+ *    1512x982  dpr 2  Ultra   2149x1395 3.00 Mpx  ->  1922x1248 2.40 Mpx
+ *    1024x1366 dpr 2  Medium  1224x1633 2.00 Mpx  ->  1060x1414 1.50 Mpx
+ *    390x844   dpr 3  Low      273x590  0.16 Mpx  ->   589x1275 0.75 Mpx
+ *
+ *  The two desktop/tablet rows are a QUALITY TRADE and should be read as one:
+ *  the retina window goes from 1.42x to 1.27x CSS resolution and the tablet
+ *  from 1.20x to 1.04x. Both are still above 1.0, so nothing is upscaled and
+ *  no detail is lost — what is given up is supersampling, which is the least
+ *  visible pixel in the frame and the only kind of pixel a battery-powered
+ *  panel should ever be asked to give up first.
+ * ===========================================================================
+ */
+const PIXEL_BUDGET_MPX: Record<Quality, number> = {
+  // A handheld is the one tier where the budget goes UP. 0.75 Mpx is 1.51x CSS
+  // on a 390x844 panel and 1.14x on a 600x960 one, so the tier is sharp on
+  // every handheld this classifier can reach rather than soft on all of them.
+  [Quality.Low]: 0.75,
+  // Tablet. 1.5 Mpx puts a 1024x1366 iPad at 1.04x its own CSS resolution —
+  // sharp, not supersampled. It used to be handed 2.00 Mpx, which is within 4%
+  // of the pixel count of the 1080p DESKTOP frame that this build measures at
+  // 58 fps on an M5, on a fanless device with shadows on.
+  [Quality.Medium]: 1.5,
+  [Quality.High]: 2.2,
+  [Quality.Ultra]: 2.4,
+};
+
+/**
+ * The invariant that keeps `Renderer`'s 4.0 Mpx backstop from becoming a second
+ * live ceiling. Cheap, runs once at boot, and says which file to look in.
+ *
+ * It is a log rather than a throw on purpose: a mis-ordered ceiling makes the
+ * game render at the wrong resolution, which is a bug worth shouting about and
+ * not worth refusing to boot over.
+ */
+const RENDERER_BACKSTOP_MPX = 4.0;
+
+function assertBackstopClearance(): void {
+  for (const [q, mpx] of Object.entries(PIXEL_BUDGET_MPX)) {
+    if (mpx >= RENDERER_BACKSTOP_MPX) {
+      logPipeline('settings',
+        `PIXEL_BUDGET_MPX[${q}] = ${mpx} is at or above Renderer's ${RENDERER_BACKSTOP_MPX} Mpx ` +
+        `backstop — there are now TWO live pixel ceilings and they disagree. ` +
+        `Lower the budget here or make the backstop the policy there, not both.`);
+    }
+  }
+}
+
+/**
+ * Lowest ratio the ceiling may impose. Below 1 the buffer is smaller than the
+ * page's own CSS layout and the compositor is upscaling — a real, visible loss
+ * that must be measured and reversible, i.e. the adaptive ladder's job, not a
+ * boot-time guess made before a single frame has been timed.
+ */
+const MIN_CEILING_RATIO = 1;
 
 let deviceProfile: DeviceProfile | null = null;
 
@@ -489,6 +672,32 @@ export function createSettings(): Settings {
   // ?scale=0.75 etc. lets the screenshot harness trade resolution for time
   const scale = parseFloat(params.get('scale') || '');
   if (Number.isFinite(scale) && scale > 0) s.renderScale = scale;
+
+  // ---- pixel-count ceiling ------------------------------------------------
+  // See PIXEL_BUDGET_MPX. Applied against the ratio the renderer will actually
+  // allocate at, which is `min(dpr, maxPixelRatio) * renderScale` — so the
+  // budget has to be divided through by renderScale here or a tier that already
+  // renders small would be charged twice for it.
+  //
+  // `innerWidth`/`innerHeight` rather than `screen`: the canvas fills `#app`,
+  // which is the window, not the panel. On a phone the visual viewport wobbles
+  // with the URL bar, which does not matter — the floor makes this inert at
+  // dpr 1 and a handheld is nowhere near the Low budget in any case.
+  assertBackstopClearance();
+  const cssPx = (globalThis.innerWidth || 0) * (globalThis.innerHeight || 0);
+  const budgetMpx = parseFloat(params.get('mpx') || '');
+  const budget = (Number.isFinite(budgetMpx) && budgetMpx > 0 ? budgetMpx : PIXEL_BUDGET_MPX[q]) * 1e6;
+  if (cssPx > 0) {
+    const ceiling = Math.sqrt(budget / (cssPx * s.renderScale * s.renderScale));
+    const capped = Math.max(MIN_CEILING_RATIO, Math.min(s.maxPixelRatio, ceiling));
+    if (capped < s.maxPixelRatio - 1e-3) {
+      logPipeline('settings',
+        `pixel ceiling: maxPixelRatio ${s.maxPixelRatio} -> ${capped.toFixed(2)} to keep the ` +
+        `drawing buffer near ${(budget / 1e6).toFixed(1)} Mpx ` +
+        `(${globalThis.innerWidth}x${globalThis.innerHeight} CSS at dpr ${dev.dpr})`);
+      s.maxPixelRatio = capped;
+    }
+  }
 
   // ---- capability-driven degrade, before the first frame ------------------
   // Nothing below fires on hardware that passes the probe, so the desktop path

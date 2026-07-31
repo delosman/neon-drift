@@ -903,13 +903,168 @@ function mergeToImpostor(root: THREE.Object3D): THREE.BufferGeometry | null {
   });
 
   if (!base) return null;
+  return clusterDecimate(pos, nrm, uv, col, idx);
+}
+
+/**
+ * Cell edge for the impostor's vertex clustering, metres.
+ *
+ * THE BAKE WAS NOT A REDUCTION. Measured with tools/perf.mjs and
+ * `__kartShadow.report()`, the merged mesh came out at 11 962 triangles against
+ * 11 900 for the fifteen detail meshes it replaces — it collapsed fifteen draw
+ * calls into one and left every triangle exactly where it was. So a kart at
+ * 60 m, drawn as a single "far LOD", was rasterising a full-detail wheel tread
+ * and a full-detail driver's hand, and so was the shadow pass, twice, for all
+ * eight karts.
+ *
+ * Two things bound how coarse the cells may be, and 3 cm clears both:
+ *
+ *   - The near cascade is 4096 px across ~110 m, i.e. 2.69 cm per texel, so a
+ *     3 cm cell moves a shadow silhouette by about one texel — inside the PCF
+ *     kernel that is already blurring it.
+ *   - `DrawBudget.LOD_SWAP` hands the camera this mesh at 20 m. A 62-degree
+ *     lens sees 24.0 m of height there, so a 1.1 m kart is ~50 px at 1080p and
+ *     one centimetre is 0.45 px: a 3 cm cell is 1.4 px of silhouette.
+ *
+ * Clustering merges by MEAN position rather than to the cell centre, which
+ * matters for exactly that second bound — snapping to centres would put the
+ * error at a full cell instead of half of one, and it quantises a smooth
+ * revolve into visible steps.
+ *
+ * DO NOT RAISE THIS TO BUY TRIANGLES. The curve was swept in-page
+ * (tools/tex-probe.mjs --label sweep), re-clustering the built impostor at six
+ * cell sizes, and it is shallow because the kart is not over-tessellated for
+ * these two uses in the first place — its mean triangle edge is already about
+ * three centimetres:
+ *
+ *     cell    tris    vs the un-clustered 11 962
+ *     3 cm    9 209        77%      <- here
+ *     4 cm    7 811        65%
+ *     5 cm    6 821        57%
+ *     6 cm    6 326        53%
+ *     8 cm    4 821        40%
+ *    10 cm    3 637        30%
+ *
+ * Every rung past 3 cm is bought from the silhouette, and the silhouette is the
+ * entire justification `DrawBudget` gives for swapping to this mesh at all. The
+ * whole kart field is ~200k of a 3.2M-triangle frame, so the most an aggressive
+ * setting could win is around 2% of the frame's triangles in exchange for
+ * chunking the one thing the far LOD exists to preserve. Not a good trade.
+ */
+const IMPOSTOR_CELL = 0.030;
+
+/**
+ * Grid vertex clustering — the merge's actual reduction step.
+ *
+ * Vertices sharing a cell collapse to one, and any triangle left with two
+ * corners in the same cluster is dropped. That is the whole algorithm; it is
+ * chosen over anything smarter because it is O(n), allocation-light, runs once
+ * at build time, and cannot fail in a way that produces a hole — collapsing a
+ * cluster too eagerly loses a triangle, never opens one.
+ *
+ * The cluster key carries a coarse COLOUR bucket as well as the cell. The
+ * impostor has no maps, so its whole albedo lives in the colour attribute, and
+ * a purely spatial cell three centimetres across happily spans the tyre and the
+ * rim, or the driver's glove and their sleeve. Averaging those gives a merged
+ * mesh that is right in shape and muddy in colour — the one thing the far LOD
+ * is supposed to preserve verbatim, because the livery is how a player tells
+ * the field apart. Four levels per channel on a square-root ramp (these are
+ * linear-space values, and a linear ramp puts almost every painted surface in
+ * the bottom bucket) keeps those pairs apart and costs very little reduction.
+ */
+function clusterDecimate(
+  pos: number[], nrm: number[], uv: number[], col: number[], idx: number[],
+): THREE.BufferGeometry {
+  const n = pos.length / 3;
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  }
+  const inv = 1 / IMPOSTOR_CELL;
+  // +1 so a vertex exactly on the max face gets its own cell rather than
+  // indexing one past the end of the grid.
+  const nx = Math.max(1, Math.floor((maxX - minX) * inv) + 1);
+  const ny = Math.max(1, Math.floor((maxY - minY) * inv) + 1);
+
+  /** 0..3 per channel on a sqrt ramp; see the colour note above. */
+  const bucket = (c: number) => {
+    const q = Math.sqrt(c < 0 ? 0 : c > 1 ? 1 : c) * 3.999;
+    return q < 0 ? 0 : q > 3 ? 3 : q | 0;
+  };
+
+  // Cluster id per source vertex, and per-cluster running sums.
+  const map = new Int32Array(n).fill(-1);
+  const keys = new Map<number, number>();
+  const cPos: number[] = [], cNrm: number[] = [], cUv: number[] = [], cCol: number[] = [];
+  const cCount: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const cx = Math.floor((pos[i * 3] - minX) * inv);
+    const cy = Math.floor((pos[i * 3 + 1] - minY) * inv);
+    const cz = Math.floor((pos[i * 3 + 2] - minZ) * inv);
+    const cell = (cz * ny + cy) * nx + cx;
+    const tint = (bucket(col[i * 3]) << 4) | (bucket(col[i * 3 + 1]) << 2) | bucket(col[i * 3 + 2]);
+    const key = cell * 64 + tint;
+    let c = keys.get(key);
+    if (c === undefined) {
+      c = cCount.length;
+      keys.set(key, c);
+      cPos.push(0, 0, 0); cNrm.push(0, 0, 0); cUv.push(0, 0); cCol.push(0, 0, 0);
+      cCount.push(0);
+    }
+    map[i] = c;
+    cCount[c]++;
+    cPos[c * 3] += pos[i * 3]; cPos[c * 3 + 1] += pos[i * 3 + 1]; cPos[c * 3 + 2] += pos[i * 3 + 2];
+    cNrm[c * 3] += nrm[i * 3]; cNrm[c * 3 + 1] += nrm[i * 3 + 1]; cNrm[c * 3 + 2] += nrm[i * 3 + 2];
+    cUv[c * 2] += uv[i * 2]; cUv[c * 2 + 1] += uv[i * 2 + 1];
+    cCol[c * 3] += col[i * 3]; cCol[c * 3 + 1] += col[i * 3 + 1]; cCol[c * 3 + 2] += col[i * 3 + 2];
+  }
+
+  const m = cCount.length;
+  const oPos = new Float32Array(m * 3);
+  const oNrm = new Float32Array(m * 3);
+  const oUv = new Float32Array(m * 2);
+  const oCol = new Float32Array(m * 3);
+  for (let c = 0; c < m; c++) {
+    const k = 1 / cCount[c];
+    oPos[c * 3] = cPos[c * 3] * k;
+    oPos[c * 3 + 1] = cPos[c * 3 + 1] * k;
+    oPos[c * 3 + 2] = cPos[c * 3 + 2] * k;
+    // A cluster that straddles both faces of a thin panel — a wing, the visor —
+    // sums to nothing. Renormalising that gives NaN, and a single NaN normal is
+    // enough for the whole draw to come out black on some drivers, so fall back
+    // to straight up rather than trusting the average.
+    let nxv = cNrm[c * 3], nyv = cNrm[c * 3 + 1], nzv = cNrm[c * 3 + 2];
+    const len = Math.hypot(nxv, nyv, nzv);
+    if (len > 1e-4) { nxv /= len; nyv /= len; nzv /= len; } else { nxv = 0; nyv = 1; nzv = 0; }
+    oNrm[c * 3] = nxv; oNrm[c * 3 + 1] = nyv; oNrm[c * 3 + 2] = nzv;
+    oUv[c * 2] = cUv[c * 2] * k; oUv[c * 2 + 1] = cUv[c * 2 + 1] * k;
+    oCol[c * 3] = cCol[c * 3] * k;
+    oCol[c * 3 + 1] = cCol[c * 3 + 1] * k;
+    oCol[c * 3 + 2] = cCol[c * 3 + 2] * k;
+  }
+
+  const oIdx: number[] = [];
+  for (let i = 0; i + 2 < idx.length; i += 3) {
+    const a = map[idx[i]], b = map[idx[i + 1]], d = map[idx[i + 2]];
+    if (a === b || b === d || a === d) continue;
+    oIdx.push(a, b, d);
+  }
+
   const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  out.setIndex(base > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+  out.setAttribute('position', new THREE.BufferAttribute(oPos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(oNrm, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(oUv, 2));
+  out.setAttribute('color', new THREE.BufferAttribute(oCol, 3));
+  out.setIndex(m > 65535 ? new THREE.Uint32BufferAttribute(oIdx, 1) : new THREE.Uint16BufferAttribute(oIdx, 1));
   out.computeBoundingSphere();
+  // What the reduction actually was, so `__kartShadow.report()` can state it
+  // rather than a harness having to rebuild the un-clustered mesh to find out.
+  out.userData.mergedVerts = n;
+  out.userData.mergedTris = idx.length / 3;
   return out;
 }
 
@@ -964,6 +1119,11 @@ function kartShadowDebug(): KartShadowDebug {
         impostorCastShadow: imp?.castShadow ?? false,
         impostorRadius: geo?.boundingSphere?.radius.toFixed(3) ?? '-',
         impostorTris: geo?.getIndex() ? geo.getIndex()!.count / 3 : 0,
+        // Before clustering, so the far LOD's reduction is readable in one call.
+        // See IMPOSTOR_CELL: the bake used to be a draw-call reduction only.
+        mergedTris: geo?.userData?.mergedTris ?? 0,
+        impostorVerts: geo?.getAttribute('position')?.count ?? 0,
+        mergedVerts: geo?.userData?.mergedVerts ?? 0,
         meshesCastingShadow: casters,
         contactShadowVisible: blob?.visible ?? false,
       };

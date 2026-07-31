@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'postprocessing';
 import { Quality, type Ctx, type Settings, type System } from '../types';
 import { PostFX } from './PostFX';
-import { glCapabilities, forcedFailure, type GLCapabilities } from '../core/Settings';
+import { glCapabilities, forcedFailure, drainErrors, type GLCapabilities } from '../core/Settings';
 import { logPipeline, recordShaderError, type FrameSample } from '../core/Diagnostics';
 
 interface DeviceProfile {
@@ -87,25 +87,47 @@ const RUNG_NAMES = ['hdr-composer', 'ldr-composer', 'direct', 'safe-materials', 
 const POST_QUADS = 20;
 
 /**
- * Recovers which material a failing program belonged to.
+ * Works out which material a failing program belonged to, and whether it is one
+ * of the ones the WORLD is made of.
  *
- * `debug.onShaderError` is handed the GL objects and nothing else, but three
- * stamps `#define SHADER_NAME <name>` into every prefix it generates, so the
- * source itself carries the identity. Every world material in this game is a
- * MeshStandard/PhysicalMaterial under a descriptive name ('tarmac-vc',
- * 'kerb-vc', 'bridge-stone-2s'), which is precisely what a report needs to say.
+ * `debug.onShaderError` is handed the GL objects and nothing else, so the
+ * identity has to be recovered from the source — three stamps
+ * `#define SHADER_NAME <name>` into every prefix it generates.
+ *
+ * BOTH shaders are read, and that is the fix for a bug this very check had on
+ * its first outing. The name lives in both prefixes but the LIGHTING MODEL only
+ * appears in the fragment shader, and reading only the vertex shader therefore
+ * returned 'tarmac-vc' with no idea what kind of material that was. Every world
+ * material in this game is a MeshStandardMaterial under a descriptive name —
+ * 'tarmac-vc', 'kerb-vc', 'bridge-stone-2s' — so a family test that looks for
+ * three's type name in the LABEL matches none of them, and a driver that
+ * rejected the entire textured PBR family was recorded as one anonymous
+ * failure. Sniffing the fragment source for the lighting chunks catches all of
+ * them, whatever they are called.
+ *
+ * `#define SHADER_NAME` is also EMPTY when a material has no name, which is why
+ * the label falls back to the family.
  */
-function shaderNameOf(gl: WebGLRenderingContext, shader: WebGLShader): string {
-  try {
-    const src = gl.getShaderSource(shader) || '';
-    const m = src.match(/#define SHADER_NAME (\S+)/);
-    const type = /RE_Direct_Physical|PhysicalMaterial material;/.test(src)
-      ? 'MeshStandardMaterial' : '';
-    if (m === null) return type;
-    return type === '' ? m[1] : `${m[1]} (${type})`;
-  } catch {
-    return '';
+function describeProgram(
+  gl: WebGLRenderingContext, vs: WebGLShader, fs: WebGLShader,
+): { label: string; world: boolean } {
+  let name = '';
+  let world = false;
+  for (const shader of [vs, fs]) {
+    let src = '';
+    try { src = gl.getShaderSource(shader) || ''; } catch { src = ''; }
+    if (src === '') continue;
+    if (name === '') {
+      const m = src.match(/#define SHADER_NAME (\S+)/);
+      if (m !== null) name = m[1];
+    }
+    // The lit families three ships. Any of them being rejected takes visible
+    // geometry with it; a postprocessing EffectMaterial being rejected does not.
+    if (/RE_Direct_Physical|RE_Direct_BlinnPhong|RE_Direct_Lambert|RE_Direct_Toon/.test(src)) {
+      world = true;
+    }
   }
+  return { label: name !== '' ? name : (world ? 'an unnamed lit material' : 'unknown'), world };
 }
 
 /** Packs the settings the pipeline actually reacts to into one comparable int. */
@@ -158,6 +180,8 @@ export class RenderPipeline implements System {
   private overrideMat: THREE.Material | null = null;
   /** Scratch for `sampleFrame`, allocated at most once per width. */
   private samplePixels: Uint8Array | null = null;
+  /** True only while `trialDraw` is running, so its own failures are not counted. */
+  private inTrial = false;
   private width = 1;
   private height = 1;
   private signature = -1;
@@ -199,6 +223,11 @@ export class RenderPipeline implements System {
     if (this.rung !== Rung.Hdr) {
       logPipeline('start', `pipeline starts on ${RUNG_NAMES[this.rung]} (boot probe)`);
     }
+    // Settled BEFORE the renderer is built, because it decides a context
+    // attribute (`antialias`) and those cannot be changed afterwards without
+    // replacing the canvas. A device that starts on the direct path needs the
+    // driver's own MSAA — there is no composer to carry the edges for it.
+    this.usePost = caps.webgl2 && this.rung <= Rung.Ldr;
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -305,13 +334,19 @@ export class RenderPipeline implements System {
     // both record and re-emit, and the info log it hands over is the exact text
     // the bug report we never received would have contained.
     renderer.debug.onShaderError = (gl, program, vs, fs) => {
-      const type = shaderNameOf(gl, vs) || shaderNameOf(gl, fs) || 'unknown';
+      const who = describeProgram(gl, vs, fs);
       const text =
-        `program link failed for "${type}"\n` +
+        `program link failed for "${who.label}"${who.world ? ' (a lit world material)' : ''}\n` +
         `  program: ${gl.getProgramInfoLog(program) || '(no log)'}\n` +
         `  vertex : ${gl.getShaderInfoLog(vs) || '(ok)'}\n` +
         `  frag   : ${gl.getShaderInfoLog(fs) || '(ok)'}`;
-      recordShaderError(text, type);
+      // The boot trial's own material is excluded from the "how many world
+      // materials failed" count on purpose: it is OUR probe, it already has a
+      // dedicated line in the log, and letting it into the count made the
+      // report say "one material failed, not enough to be systemic, the
+      // pipeline is left alone" on a boot where the pipeline had in fact
+      // already dropped to the safe rung because of that very failure.
+      recordShaderError(text, who.label, who.world && !this.inTrial);
       console.error('[render] ' + text);
     };
 
@@ -490,7 +525,7 @@ export class RenderPipeline implements System {
     let status = 0;
     let err = 0;
     try {
-      while (gl.getError() !== gl.NO_ERROR) { /* drain anything we inherited */ }
+      drainErrors(gl);
       this.renderer.setRenderTarget(rt);
       status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       err = gl.getError();
@@ -738,7 +773,7 @@ export class RenderPipeline implements System {
       // The default framebuffer is what the player sees; anything still bound
       // from the last pass is not.
       this.renderer.setRenderTarget(null);
-      while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
+      drainErrors(gl);
       for (const frac of [0.45, 0.75]) {
         const y = Math.min(h - rows, Math.max(0, Math.round(h * frac)));
         gl.readPixels(0, y, w, rows, gl.RGBA, gl.UNSIGNED_BYTE, buf);
@@ -781,10 +816,16 @@ export class RenderPipeline implements System {
     const mat = new THREE.MeshPhysicalMaterial({
       color: 0xe0453f, metalness: 0, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06,
     });
+    // Named so `#define SHADER_NAME` carries it: three uses the material's name
+    // for that define and leaves it EMPTY when there is none, which is exactly
+    // the case where a report would say "unknown" about the one program whose
+    // identity matters most.
+    mat.name = 'boot-trial-physical';
     const prevTarget = this.renderer.getRenderTarget();
     const prevClear = new THREE.Color();
     this.renderer.getClearColor(prevClear);
     const prevAlpha = this.renderer.getClearAlpha();
+    this.inTrial = true;
     try {
       // 8-bit on purpose: this probe asks about the MATERIAL, and pairing it
       // with a float target would confuse a shader failure with a format one.
@@ -815,6 +856,7 @@ export class RenderPipeline implements System {
     } catch (err) {
       return { ok: false, detail: String(err) };
     } finally {
+      this.inTrial = false;
       this.renderer.setRenderTarget(prevTarget);
       this.renderer.setClearColor(prevClear, prevAlpha);
       scene.clear();
@@ -1093,8 +1135,55 @@ export class RenderPipeline implements System {
       this.renderer?.capabilities?.maxTextureSize ?? 4096,
       this.maxRenderbufferSize(),
     );
+    //
+    // BOTH CLAMPS BELOW MULTIPLY `scale` BACK IN, and that is not cosmetic.
+    // `ratio` already contains `scale` (renderScale * dynamicScale); returning a
+    // bare `limit / longest` or `sqrt(budget / pixels)` throws it away, so above
+    // either ceiling the adaptive ladder has NO AUTHORITY OVER BUFFER SIZE AT
+    // ALL — `setDynamicScale` moves `dynamicScale`, `applyResolution` runs, and
+    // the drawing buffer comes back byte-identical. Proven with the harness:
+    // `--scale 1.5` and `--scale 2.0` both produced exactly 2666x1500 = 4.00
+    // Mpx. A retina 1512x982 window at devicePixelRatio 2 is 5.94 Mpx, i.e.
+    // over the backstop before the ladder has taken a single rung, so on the
+    // machine this game is developed on the ladder's first step was silently
+    // swallowed. Multiplying through keeps the ceiling a CEILING and leaves the
+    // ladder free to go below it, which is the only arrangement in which both
+    // mechanisms mean what their names say.
     const longest = Math.max(this.width, this.height);
-    if (longest * ratio > limit) return Math.max(0.25, limit / longest);
+    if (longest * ratio > limit) return Math.max(0.25, (limit / longest) * scale);
+
+    // A CEILING ON TOTAL PIXELS, NOT ONLY ON THE RATIO.
+    //
+    // `maxPixelRatio` caps a MULTIPLIER, and a multiplier does not know how big
+    // the window is. Every cost in this frame that matters scales with the
+    // product: the audit for this round fits the whole build at ~7.0 ms of fill
+    // per megapixel plus ~7.5 ms of resolution-independent per-frame cost, and
+    // the post chain alone is 5.3 ms/Mpx of that. So the same `maxPixelRatio:
+    // 2` that is harmless on a 1280x800 laptop panel (4.1 Mpx) asks a retina
+    // 1920x1200 desktop for 9.2 Mpx and 65+ ms frames — which is why the
+    // machine this game is developed on renders 3840x2160 and gets ~15 fps
+    // while the 1080p bench profile it is tuned against sits at 2.07 Mpx and
+    // never sees the problem.
+    //
+    // 4.0 Mpx is deliberately a BACKSTOP rather than the policy. It is above
+    // every native-resolution desktop the game is likely to meet — 2560x1440 is
+    // 3.69 Mpx and passes through untouched, and so does 1080p at any ratio up
+    // to 1.39 — so it never blurs a monitor that is simply large. What it
+    // catches is devicePixelRatio-2 SUPERSAMPLING, where the CSS pixels are
+    // already small and the extra samples are the least visible pixels in the
+    // frame. On the 1920x1200 retina case it takes the ratio from 2.0 to ~1.29,
+    // which is still 1.7 geometric samples per CSS pixel in each axis with SMAA
+    // running last on top. That IS a resolution reduction and it should be read
+    // as one; it is the difference between a playable frame and a slideshow on
+    // a machine that was getting neither the pixels nor the frame rate.
+    //
+    // The tier's `maxPixelRatio` remains the primary knob and is applied above;
+    // this only ever takes the lower of the two.
+    const budget = 4.0e6;
+    const pixels = this.width * this.height * ratio * ratio;
+    if (pixels > budget) {
+      return Math.max(0.25, Math.sqrt(budget / (this.width * this.height)) * scale);
+    }
     return ratio;
   }
 

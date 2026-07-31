@@ -694,7 +694,32 @@ function cascadeSpecs(shadows: boolean, quality: Quality): CascadeSpec[] {
     intensity: SUN_INTENSITY,
     extent: two ? NEAR_EXTENT : SOLO_EXTENT,
     distance: NEAR_DISTANCE,
-    mapSize: quality >= Quality.Ultra ? 4096 : quality >= Quality.High ? 3072 : 2048,
+    // ULTRA NO LONGER GETS A BIGGER MAP THAN HIGH, AND THE REST OF THIS FILE IS
+    // THE ARGUMENT FOR IT.
+    //
+    // Every design number here is quoted against 3072 near / 2048 far. The
+    // receiver-plane bias derivation above works the near texel out as
+    // "110 m / 3072 = 3.6 cm"; `FAR_EXTENT` was moved from 220 to 190 precisely
+    // because "the far cascade is 2048² on High, so its texel is 2 * extent /
+    // 2048" and 190 is what puts that step at 18.6 cm. The Ultra bump to
+    // 4096/3072 was bolted on afterwards and no filter constant was ever
+    // re-derived for it, so it bought sharpness the kernel was not written to
+    // exploit — 9 taps at 4 texels is a texel-relative kernel, so a finer map
+    // makes the penumbra NARROWER, not better sampled.
+    //
+    // What it cost is the largest single item in the resolution-INDEPENDENT
+    // half of the frame, which is the half no pixel optimisation can reach.
+    // Measured, at 1920x1080 Ultra:
+    //
+    //   depth texels allocated   26.21 Mpx -> 13.63 Mpx   (-48%)
+    //   rasterised per frame     19.93 Mpx -> 10.84 Mpx   (-46%)
+    //     (near every frame + far amortised over FAR_UPDATE_INTERVAL)
+    //   depth attachment memory  ~105 MB   -> ~54 MB
+    //
+    // 26.2 Mpx of depth against a 2.07 Mpx screen is 12.6 screens' worth of
+    // rasterisation for the shadow term alone. 13.6 is 6.6, which is still
+    // generous for two cascades.
+    mapSize: quality >= Quality.High ? 3072 : 2048,
     bias: -0.00004,
     // Down from 0.022/0.05. The normal offset is a vertex-stage nudge that helps
     // at silhouettes and does almost nothing at a 14° sun (it converts to depth
@@ -713,7 +738,9 @@ function cascadeSpecs(shadows: boolean, quality: Quality): CascadeSpec[] {
     intensity: 0,
     extent: FAR_EXTENT,
     distance: FAR_DISTANCE,
-    mapSize: quality >= Quality.Ultra ? 3072 : 2048,
+    // 2048 on every tier that has a far cascade at all — see the note on the
+    // near map above. `FAR_EXTENT`'s own comment derives 190 from this number.
+    mapSize: 2048,
     bias: -0.00008,
     normalBias: 0.06,
     interval: FAR_UPDATE_INTERVAL,

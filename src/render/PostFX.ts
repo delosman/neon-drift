@@ -13,8 +13,9 @@
  *                          buffer and composites onto that, so when AO is on it
  *                          — not the composer — owns the multisampling. See
  *                          build().
- *    EffectPass[DoF]       shallow bokeh focused on the player kart
- *    EffectPass[Bloom]     high-threshold mipmap bloom, wide + soft
+ *    EffectPass[DoF,Bloom] shallow bokeh focused on the player kart, then a
+ *                          high-threshold mipmap bloom, wide + soft. ONE pass:
+ *                          see `mergeable()` for why these two and no others.
  *    EffectPass[Grade]     ONE shader: reprojection motion blur + chromatic
  *                          aberration + highlight shoulder + ACES + S-curve +
  *                          split tone (teal lift / warm gain) + sat rolloff +
@@ -45,6 +46,108 @@ import {
 // @ts-ignore — n8ao ships no type declarations, and we may not add a .d.ts here.
 import { N8AOPostPass } from 'n8ao';
 import { Quality, type Ctx } from '../types';
+
+/**
+ * The fraction of the drawing buffer the depth-of-field effect runs its own
+ * targets at. See {@link ScaledDepthOfFieldEffect}.
+ */
+const DOF_INTERNAL_SCALE = 0.5;
+
+/**
+ * DepthOfFieldEffect with ALL of its internal targets scaled, not just some.
+ *
+ * `resolutionScale: 0.5` reads like it halves the effect. It does not. Read
+ * postprocessing 6.39's `DepthOfFieldEffect.setSize`: `renderTargetFar`,
+ * `renderTargetCoC` and `renderTargetMasked` are sized at the FULL base
+ * resolution, and only `renderTarget`, `renderTargetNear` and
+ * `renderTargetCoCBlurred` get the scale. Probed on this build at 1920x1080,
+ * which is how the split was found rather than assumed:
+ *
+ *   renderTargetMasked  1920x1080 HalfFloat      renderTarget         960x540
+ *   renderTargetFar     1920x1080 HalfFloat      renderTargetNear     960x540
+ *   renderTargetCoC     1920x1080 RGBA8          renderTargetCoCBlurred 960x540
+ *
+ * `update()` runs seven full-screen passes over those, four of them full-res,
+ * plus a four-iteration Kawase blur — 9.85 Mpx of full-screen writes per frame
+ * against a 2.07 Mpx screen. That is 4.75 screens of fill, and it is the single
+ * largest item in the post chain after the AO pass, for an effect the comment
+ * at its call site correctly describes as "garnish only".
+ *
+ * Halving the BASE and letting the library's own scale apply on top puts the
+ * first tier at 960x540 and the second at 480x270:
+ *
+ *   full-screen writes per frame   9.85 Mpx -> 2.46 Mpx   (-75%)
+ *   render target memory           51.9 MB  -> 12.9 MB
+ *   full-res (2.07 Mpx) targets in the whole chain  9 -> 6
+ *
+ * THE BOKEH RADIUS IS HELD, and that took a second edit rather than one.
+ * `BokehMaterial` steps its kernel by `texelSize * scale`, and `texelSize` is
+ * `1 / whatever width the material was told about` — so halving the base
+ * DOUBLES the screen-space blur, which is a visible change to an authored art
+ * parameter smuggled in under a performance change. It showed: on shots/grid
+ * the lighthouse and the far grandstand came back distinctly softer.
+ *
+ * The obvious fix — halve `bokehScale` — is wrong, because that setter also
+ * drives the composite's `scale` uniform (`min(coc * scale, 1.0)`) and the
+ * mask pass's `strength`. It would remove blur AMOUNT as well as blur WIDTH,
+ * i.e. trade one unrequested art change for another. So only the four bokeh
+ * materials are compensated, leaving the blend and the mask exactly as
+ * authored. 0.625 texels of a 960-wide buffer is the same UV offset as 1.25 of
+ * a 1920-wide one, so the kernel is identical, not merely similar.
+ *
+ * WHAT IS LEFT AS A REAL TRADE, and it is small: the far colour buffer is now
+ * bilinearly upsampled from 960x540, which adds roughly a pixel of softening on
+ * top of the authored ~1.25 px; and the circle of confusion is computed at half
+ * resolution, which only matters at an in-focus/out-of-focus boundary. With
+ * focusDistance 9 and focusRange 60 the only such boundary in this game is the
+ * headland against the sky.
+ *
+ * The reentry guard is load-bearing. `Resolution` fires a `change` event from
+ * inside `setBaseSize`, and its listener calls `this.setSize(baseWidth,
+ * baseHeight)` — dynamic dispatch, so it lands back HERE with an already-halved
+ * base and would halve it again, and again, until the buffer rounds to nothing.
+ * `super.setSize` finishes sizing every target after `setBaseSize` returns, so
+ * swallowing the reentrant call loses nothing.
+ */
+class ScaledDepthOfFieldEffect extends DepthOfFieldEffect {
+  private sizing = false;
+
+  constructor(camera: THREE.Camera, opts: {
+    focusDistance: number; focusRange: number; bokehScale: number; resolutionScale: number;
+  }) {
+    super(camera, opts);
+    // The four bokeh passes are public fields on the effect but are not in
+    // postprocessing's shipped .d.ts, hence the cast. Guarded rather than
+    // assumed: if a future version renames them the compensation is skipped and
+    // the blur widens, which is a look change — not a crash — and the assert
+    // below is what a reviewer would want to see fire.
+    const dof = this as unknown as Record<string, { fullscreenMaterial?: { scale?: number } }>;
+    const names = ['bokehNearBasePass', 'bokehNearFillPass',
+      'bokehFarBasePass', 'bokehFarFillPass'];
+    for (const n of names) {
+      const mat = dof[n]?.fullscreenMaterial;
+      if (mat === undefined || typeof mat.scale !== 'number') {
+        console.warn(`[postfx] ${n} has no bokeh material; DoF kernel not compensated ` +
+          `for the ${DOF_INTERNAL_SCALE}x internal buffer and will be wider than authored`);
+        continue;
+      }
+      mat.scale = opts.bokehScale * DOF_INTERNAL_SCALE;
+    }
+  }
+
+  override setSize(width: number, height: number): void {
+    if (this.sizing) return;
+    this.sizing = true;
+    try {
+      super.setSize(
+        Math.max(1, Math.round(width * DOF_INTERNAL_SCALE)),
+        Math.max(1, Math.round(height * DOF_INTERNAL_SCALE)),
+      );
+    } finally {
+      this.sizing = false;
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // The merged grade / lens shader.
@@ -925,8 +1028,9 @@ export class PostFX {
       //
       // BACK UP TO 1.2 m. The move from 1.5 to 0.9 last round was reasoned from
       // the tyre contact patch and it overshot in the other direction, because
-      // the AO buffer is HALF RESOLUTION everywhere except Ultra and the review
-      // is judging objects at chase distance, not at 1 m. Work it out at the
+      // the AO buffer is HALF RESOLUTION (on every tier now — see `halfRes`
+      // below, which used to make Ultra the exception) and the review is
+      // judging objects at chase distance, not at 1 m. Work it out at the
       // distance the frames are actually shot from: with a 62 deg vertical FOV
       // at 1920x1080, a 0.9 m world radius around a kart 25 m away subtends
       // ~58 px full-res, i.e. 29 px on the half-res buffer — but the occluded
@@ -974,7 +1078,17 @@ export class PostFX {
       // the signal. One iteration at High; the second buys smoothness the tyre
       // contact does not want.
       cfg.denoiseRadius = 2;
-      cfg.denoiseIterations = q >= Quality.Ultra ? 2 : 1;
+      // ONE ITERATION EVERYWHERE, INCLUDING ULTRA.
+      //
+      // The paragraph above already argues that the second pass "buys
+      // smoothness the tyre contact does not want", and it only ever ran on
+      // Ultra, which was also the only tier running AO at full resolution. Now
+      // that Ultra is on the half-res buffer with everything else (see below),
+      // a second 2-texel poisson pass on a half-res buffer is a 8 px blur on
+      // the contact band this radius was widened to protect — it would undo
+      // §9.4 rather than polish it. It is also the cheaper half of a pair of
+      // changes: the AO pass is the most expensive thing in the chain.
+      cfg.denoiseIterations = 1;
       // Occlusion tinted toward the sky fill instead of black — the art bible
       // forbids pure-black shadow, and cool crevices sit right next to the
       // warm key light.
@@ -982,7 +1096,31 @@ export class PostFX {
       cfg.colorMultiply = true;
       cfg.screenSpaceRadius = false;
       cfg.depthAwareUpsampling = true;
-      cfg.halfRes = q < Quality.Ultra;
+      // HALF RESOLUTION ON EVERY TIER. This used to read `q < Quality.Ultra`,
+      // which made Ultra the only tier in the game running ambient occlusion at
+      // full drawing-buffer resolution — and Ultra is handed out to every Apple
+      // M, RTX, Radeon RX and Arc machine, i.e. to exactly the desktops the
+      // 60 fps target is written for.
+      //
+      // It was the single most expensive thing in the frame. Measured with a
+      // paired A/B inside one session (a fresh baseline block before every arm,
+      // the simulation held still with `window.__freeze` so both arms render
+      // the same frame, the adaptive scaler pinned), flipping Ultra to half res
+      // took 5.1, 5.3 and 8.7 ms out of a 1080p-equivalent frame across three
+      // runs on a box that was carrying other agents' harnesses at the time.
+      // The pre-round audit, measured on a quiet box, puts the same change at
+      // 2.24 -> 0.84 ms/Mpx, i.e. ~2.9 ms at 1080p. Either way it is the
+      // largest single saving available in this chain.
+      //
+      // And it costs nothing that was ever signed off: half res is what
+      // Quality.High has always shipped, it is the buffer the whole radius /
+      // falloff / denoise argument above was reasoned and measured against, and
+      // `depthAwareUpsampling` (on, just above) is what keeps the occlusion
+      // pinned to the depth discontinuities on the way back up. Ultra still
+      // differs from High where it can be seen — 16 aoSamples against 8, and a
+      // stronger `intensity` — it just stops paying four times the fill rate
+      // for a buffer nobody was judging at full resolution.
+      cfg.halfRes = true;
       cfg.accumulate = false;
       cfg.neuralDenoise = false;
       // The auto-detect walks the entire scene graph every single frame.
@@ -993,19 +1131,27 @@ export class PostFX {
     }
 
     // --- depth of field ----------------------------------------------------
+    // Built here, ADDED BELOW. DoF and bloom go into one EffectPass together;
+    // see the note on `merged` after the bloom block.
+    let dofEffect: DepthOfFieldEffect | null = null;
     if (s.dof) {
       // Garnish only: a long focus range means the road, the kerbs and the
       // next two corners stay razor sharp and only the bay and the headland
       // soften. bokehScale stays small for the same reason.
-      const dof = new DepthOfFieldEffect(ctx.camera, {
+      const dof = new ScaledDepthOfFieldEffect(ctx.camera, {
         focusDistance: 9,
         focusRange: 60,
         bokehScale: 1.25,
+        // Applied ON TOP of the halved base in ScaledDepthOfFieldEffect, so the
+        // blur tier lands at a quarter of the drawing buffer. The near-field
+        // half of that tier is very nearly a no-op in this game anyway: with
+        // focusDistance 9 and focusRange 60, a subject 1 m from the lens has a
+        // near CoC of smoothstep(0, 60, 8) = 0.05.
         resolutionScale: 0.5,
       });
       dof.target = _dofTarget.set(0, 0, 0);
       this.dof = dof;
-      this.add(composer, new EffectPass(ctx.camera, dof));
+      dofEffect = dof;
     }
 
     // --- bloom -------------------------------------------------------------
@@ -1071,7 +1217,44 @@ export class PostFX {
         levels: 6,
       });
       this.bloom = bloom;
-      this.add(composer, new EffectPass(ctx.camera, bloom));
+    }
+
+    // --- one pass for both -------------------------------------------------
+    // TWO EFFECTS, ONE FULL-SCREEN ROUND TRIP. Each EffectPass is a read of the
+    // composer's 1920x1080 half-float buffer and a write back to the other one
+    // — 15.8 MB each way, 31.6 MB per pass per frame, 1.9 GB/s at 60 Hz — so a
+    // pass that exists only because two effects were constructed separately is
+    // pure bandwidth. Merged, the chain goes from 6 full-screen passes to 5 and
+    // from 122 programs to 121.
+    //
+    // ONLY these two, and the rule is mechanical rather than a matter of taste:
+    //
+    //   - postprocessing refuses to merge two effects that both declare
+    //     `EffectAttribute.CONVOLUTION` ("Convolution effects cannot be
+    //     merged"). GradeEffect declares it (reprojection motion blur samples
+    //     along a velocity vector) and so does SMAAEffect, so those two can
+    //     never share a pass with each other.
+    //   - GradeEffect cannot join THIS pass either, and the reason is the sort
+    //     rather than the rule: `EffectPass` orders its effects by
+    //     `b.attributes - a.attributes`, and CONVOLUTION|DEPTH is 3 against
+    //     DoF's DEPTH 1 and Bloom's NONE 0. The grade would be reordered to
+    //     FIRST, which would run the display transform before bloom added
+    //     scene-linear HDR energy on top of an already display-referred image.
+    //   - SMAA has to stay last on its own regardless: it is the final resolve,
+    //     and it is deliberately placed after the grain and the aberration.
+    //
+    // DoF (1) then Bloom (0) is the order that same sort produces, which is the
+    // order they were already in. One semantic change and it is small: bloom's
+    // `update()` now prefilters the composer's input buffer instead of the
+    // DoF's output, so it sources from the unblurred image. The bloom sources
+    // in this game are the sun disc, chrome, water sparkle and boost flame, and
+    // the far-field CoC that DoF applies to them is ~2.5 px going into a
+    // six-level mip chain.
+    const merged: Effect[] = [];
+    if (dofEffect !== null) merged.push(dofEffect);
+    if (this.bloom !== null) merged.push(this.bloom);
+    if (merged.length > 0) {
+      this.add(composer, new EffectPass(ctx.camera, ...merged));
     }
 
     // --- merged grade / lens ----------------------------------------------

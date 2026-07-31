@@ -1765,17 +1765,45 @@ function derive(index: number, base: THREE.Color) {
 }
 
 /**
- * Panel atlas layout. Each rect is a *sub*-rect of the 1024² canvas chosen so
- * that its pixel aspect matches the physical panel it is painted on — draw a
- * circle in the band and you get a circle on the kart, not an ellipse.
+ * Panel atlas dimensions.
+ *
+ * This was a 1024² square and 44% of it was blank base colour — the four
+ * panels occupied two horizontal bands with dead rows above, below and between
+ * them. Eight racers each carry their own copy, so that dead space was 2.05 MB
+ * per livery and 16.4 MB of the scene's 364 MB of texture, measured with
+ * tools/tex-probe.mjs. The canvas is now only as tall as the bands need.
+ *
+ * The panels themselves are NOT smaller: every rect below keeps the exact pixel
+ * dimensions it had on the square atlas (pods 512x205, nose 512x370, tail
+ * 512x284), so texel density per metre of bodywork is unchanged and no camera
+ * in the game sees a softer decal. This is a packing change, not a resolution
+ * change — which is the whole reason to prefer it to simply halving the atlas.
+ *
+ * 600 rather than the 575 the bands strictly need, because of the eight-pixel
+ * GUTTERS. The panel quads are UV'd flush to the edge of their rect, so a
+ * linear tap at a panel's border samples half a texel outside it. On the square
+ * atlas that neighbour was always the base paint colour, i.e. exactly what
+ * surrounds the panel on the real bodywork, and the bleed was invisible by
+ * accident. Packed tight, the pod's top edge would instead bleed the nose
+ * plate's chevrons. The gutters put the base colour back.
+ */
+const PANEL_W = 1024;
+const PANEL_H = 600;
+
+/**
+ * Panel atlas layout. Each rect is a *sub*-rect of the PANEL_W x PANEL_H canvas
+ * chosen so that its pixel aspect matches the physical panel it is painted on —
+ * draw a circle in the band and you get a circle on the kart, not an ellipse.
  * KartModel imports these and sizes its panels from PANEL_SIZE, so the two can
- * never drift apart.
+ * never drift apart. Check both when touching either: pod 512x205 px against
+ * 0.60x0.24 m is 2.498 vs 2.500, nose 512x370 against 0.36x0.26 is 1.384 vs
+ * 1.385, tail 512x284 against 0.36x0.20 is 1.803 vs 1.800.
  */
 export const PANEL_UV = {
-  podL: [0.0, 0.15, 0.5, 0.20] as const,
-  podR: [0.5, 0.15, 0.5, 0.20] as const,
-  nose: [0.0, 0.5695, 0.5, 0.3611] as const,
-  tail: [0.5, 0.6111, 0.5, 0.2778] as const,
+  podL: [0.0, 8 / 600, 0.5, 205 / 600] as const,
+  podR: [0.5, 8 / 600, 0.5, 205 / 600] as const,
+  nose: [0.0, 221 / 600, 0.5, 370 / 600] as const,
+  tail: [0.5, 221 / 600, 0.5, 284 / 600] as const,
 };
 /** Physical size of each panel in metres, matched to the rects above. */
 export const PANEL_SIZE = {
@@ -1789,19 +1817,20 @@ export const PANEL_SIZE = {
  * a baked speckle, so a panel needs no second texture set of its own.
  */
 function decalCanvas(l: Omit<Livery, 'decal' | 'decalMat'>): HTMLCanvasElement {
-  const S = 1024;
-  const c = canvas(S);
+  const W = PANEL_W;
+  const H = PANEL_H;
+  const c = canvas(W, H);
   const base = `#${l.base.getHexString()}`;
   const trim = `#${l.trim.getHexString()}`;
   const accent = `#${l.accent.getHexString()}`;
   const dark = `#${l.shadowed.getHexString()}`;
 
   c.fillStyle = base;
-  c.fillRect(0, 0, S, S);
+  c.fillRect(0, 0, W, H);
 
   /** UV rect -> canvas pixel band (canvas y grows downward, v grows upward). */
   const band = (r: readonly [number, number, number, number]) => ({
-    x: r[0] * S, y: (1 - r[1] - r[3]) * S, w: r[2] * S, h: r[3] * S,
+    x: r[0] * W, y: (1 - r[1] - r[3]) * H, w: r[2] * W, h: r[3] * H,
   });
 
   /** Run `draw` in a clipped, origin-shifted context for one band. */
@@ -1942,7 +1971,7 @@ function decalCanvas(l: Omit<Livery, 'decal' | 'decalMat'>): HTMLCanvasElement {
   // generated small and upscaled: it is a soft metallic shimmer, and eight of
   // these at full res would dominate the boot cost
   c.globalAlpha = 0.09;
-  fbmFillInto(c, 0, 0, S, S, 0.02, 3, 100 + l.index, (n) => {
+  fbmFillInto(c, 0, 0, W, H, 0.02, 3, 100 + l.index, (n) => {
     const v = Math.round(60 + n * 190);
     return [v, v, v];
   }, 224);
@@ -2555,6 +2584,18 @@ void main() {
   // the mesh sit in dead field and can never draw a line on the road.
   vec2 e = abs( vP ) / uHalf;
   occ *= ( 1.0 - smoothstep( 0.74, 0.98, e.x ) ) * ( 1.0 - smoothstep( 0.74, 0.98, e.y ) );
+
+  // The one blended surface in the game that was missing the alpha cutoff every
+  // other one has (Particles, Trails, Decals, Motes, Shimmer all carry it).
+  // This quad is 3 x 3 m of ground per kart and the four lobes are circles of
+  // radius ~0.73 m centred on the axle corners, so the corners of the square —
+  // and the whole outer margin the smoothstep above has just zeroed — resolve
+  // to alpha 0 and were still being read-modify-written into the framebuffer,
+  // eight times a frame. Blending alpha 0 is arithmetically identical to not
+  // blending at all, so this changes no pixel; it only stops paying for the
+  // ones it cannot change. Costs nothing in early-Z, which this material has
+  // already given up: it is transparent with depthWrite off.
+  if ( occ < 0.004 ) discard;
 
   gl_FragColor = vec4( uTint, clamp( occ, 0.0, 1.0 ) );
 }
