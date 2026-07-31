@@ -202,6 +202,8 @@ export class Race implements IRace {
   /** the state to return to when the pause menu is dismissed */
   private prePause: RaceState = RaceState.Racing;
   private pauseThrottleClear = false;
+  /** index into `karts` the human drives; see `selectKart` */
+  private selected = 0;
 
   // ---------------------------------------------------------------- lifecycle
 
@@ -219,6 +221,7 @@ export class Race implements IRace {
       this.standings.push(k);
     }
     this.player = this.karts[0];
+    this.selected = 0;
 
     // The line is solved once, here, and shared: the drivers steer along it and
     // red shells chase along it, so a shell tracks exactly where its victim is
@@ -274,13 +277,53 @@ export class Race implements IRace {
     this.start();
   }
 
+  get selectedKart(): number {
+    return this.selected;
+  }
+
+  /**
+   * Move the player onto a different kart. See `IRace.selectKart`.
+   *
+   * Karts are constructed once in `init` — `buildKart(stats)` bakes the model,
+   * livery and driver — so this cannot swap `stats` and cannot rebuild without
+   * leaking the old GPU buffers. It moves the `isPlayer` flag instead, and
+   * pairs it with a grid-slot swap so the chosen racer still lines up on pole
+   * rather than starting from wherever its roster index happens to sit.
+   *
+   * Nothing is reordered: `karts`, `prog` and `standings` stay index-aligned,
+   * and every `id` keeps its value so the AI's maps and in-flight projectiles
+   * survive a change made on the select screen between races.
+   */
+  selectKart(index: number) {
+    const n = this.karts.length;
+    if (n === 0) return;
+    const want = Math.min(Math.max(Math.floor(index), 0), n - 1);
+    if (want === this.selected) return;
+    this.karts[this.selected].isPlayer = false;
+    this.karts[want].isPlayer = true;
+    this.selected = want;
+    this.player = this.karts[want];
+  }
+
+  /**
+   * Grid slot for kart `i`. Identity except that the player's kart and whoever
+   * owns pole trade places, so the human always starts at the front.
+   */
+  private slotFor(i: number): number {
+    if (this.selected === 0) return i;
+    if (i === this.selected) return 0;
+    if (i === 0) return this.selected;
+    return i;
+  }
+
   /** Stagger everyone back onto the grid and wipe their race record. */
   private formGrid() {
     const track = this.ctx.track;
     const N = track.checkpointCount;
     for (let i = 0; i < this.karts.length; i++) {
       const k = this.karts[i];
-      const slot = track.startGrid[i] ?? track.startGrid[track.startGrid.length - 1];
+      const gi = this.slotFor(i);
+      const slot = track.startGrid[gi] ?? track.startGrid[track.startGrid.length - 1];
 
       // Take the *station* and the *side* from the slot and re-solve the rest
       // here. Both returns are pooled, so the two numbers we need are read out

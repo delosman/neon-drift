@@ -343,6 +343,10 @@ export class Menus {
     this.resultsBuilt = false;
     this.resultsFinished = -1;
     this.finishTimes.clear();
+    // Hand the choice over BEFORE resetting. This line is the whole point of
+    // the select screen: without it `this.selected` only ever moved a CSS
+    // highlight, and every race was driven in kart 0 whatever was clicked.
+    ctx.race.selectKart(this.selected);
     ctx.race.reset();
   }
 

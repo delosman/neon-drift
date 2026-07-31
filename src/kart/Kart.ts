@@ -137,12 +137,42 @@ const HOP_SPEED = 3.05;
 const DRIFT_REAR_GRIP_IN = 0.98;
 const DRIFT_REAR_GRIP_OUT = 0.6;
 /**
- * Seconds of held drift for blue / orange / purple. Shortened from
- * [0.9, 2.0, 3.2]: the charge clock only runs at 0.72-1.22x real time, so the
- * old thresholds wanted 2.6-4.4 s of unbroken slide to reach purple, which is
- * longer than most corners on this circuit last.
+ * ============================================================================
+ *  Seconds of held drift for blue / orange / purple
+ * ============================================================================
+ *  [0.55, 0.95, 1.9], from [0.6, 1.45, 2.5], and before that [0.9, 2.0, 3.2].
+ *  The numbers are placed against a measured distribution rather than picked.
+ *
+ *  Traced over three laps with a button driven off a real steering trace, the
+ *  charge banked by a slide before something ends it falls out like this:
+ *
+ *      < 0.3 : 3     < 0.9 : 4     < 1.5 : 1     < 2.5 : 0
+ *      < 0.6 : 1     < 1.2 : 14    < 2.0 : 0     >= 3.5 : 4      (n = 28)
+ *
+ *  That fat cluster between 0.9 and 1.2 s is not a coincidence and it is worth
+ *  understanding, because it is what sets the middle of the ladder. A slide
+ *  reaches tier 1, the grace above stops applying the moment anything is
+ *  banked, and the next dip of the button therefore cashes out — and the dips
+ *  arrive about every half second. So 0.55 s of charge plus one gap is where an
+ *  ordinary slide ends, and any tier-2 threshold above ~1.2 s is a rung nobody
+ *  stands on.
+ *
+ *  0.95 s puts tier 2 just under that cluster, so the ordinary case banks
+ *  orange instead of blue. 1.9 s is above everything the cluster reaches, so
+ *  purple still costs an unbroken hold — the four attempts past 3.5 s are all
+ *  slides held most of the way round the harbour sweep or the banked 180, which
+ *  is exactly where purple is meant to live.
+ *
+ *  The circuit's four drift corners, driven at ~22 m/s and held throughout, are
+ *  worth roughly: bridge & return 3.5 s, village esses 5.5 s, harbour sweep
+ *  10 s, banked 180 11 s. So every corner can pay orange and the two long ones
+ *  can pay purple — if you can keep it on the road for that long, which is the
+ *  part that is actually hard. Held right through, a slide spends 11.6% of its
+ *  frames with a wheel off the tarmac against 2.6% for a released one, and the
+ *  clock stops out there.
+ * ============================================================================
  */
-const DRIFT_TIERS = [0.6, 1.45, 2.5];
+const DRIFT_TIERS = [0.55, 0.95, 1.9];
 
 /**
  * ============================================================================
@@ -287,16 +317,26 @@ const DRIFT_RELEASE_GRACE = 0.3;
  *  array index; nothing here allocates after the table exists. It is shared by
  *  every kart, keyed on the track object, so a rebuilt circuit rebuilds it.
  *
- *  Sunset Bay's corners peak at 0.0055 (the shallow cliff kink) through 0.0156
- *  (the banked 180); its straights sit under 0.001. The window below therefore
- *  separates them with a wide margin at both ends.
+ *  Dumped over Sunset Bay, the profile separates cleanly into three bands and
+ *  the window is placed in the gap between the second and the third:
+ *
+ *      harbour sweep     0.0091 - 0.0110      banked 180    0.0068 - 0.0155
+ *      village esses     0.0093 - 0.0115      bridge/return 0.0044 - 0.0077
+ *      ---- window ------------------------------------------------------
+ *      cliff traverse    0.0026 - 0.0058      tunnel        0.0028 - 0.0031
+ *      start straight    0.0012 - 0.0021      beach descent 0.0004 - 0.0034
+ *
+ *  Which is to say: four drift corners, and everything else is connective
+ *  tissue. An earlier window at 0.0025-0.0045 put the tunnel and most of the
+ *  cliff traverse INSIDE the corner set, and since this circuit is "never flat
+ *  for more than 120 m" that was enough to keep a slide alive over half a lap.
  * ============================================================================
  */
 const CORNER_BINS = 512;
-/** below this, 400 m radius, nothing is a corner */
-const CORNER_CURV_MIN = 0.0025;
-/** at this, 220 m radius, it is a corner by any measure */
-const CORNER_CURV_FULL = 0.0045;
+/** below this, 222 m radius, nothing is a corner */
+const CORNER_CURV_MIN = 0.0045;
+/** at this, 143 m radius, it is a corner by any measure */
+const CORNER_CURV_FULL = 0.007;
 /** how long a held slide survives once it has left the corner, seconds */
 const DRIFT_STRAIGHT_BAIL = 1.0;
 
@@ -395,10 +435,21 @@ function chargeFor(t: number) {
  *  the player reads as "this is still going" halfway down the next straight,
  *  and because a ceiling much past 40 m/s starts to outrun the corner the boost
  *  is being fired into.
+ *
+ *  Re-spread again once the ladder was made reachable, [1.25, 1.85, 2.6] ->
+ *  [0.95, 1.8, 3.0], with strengths [1.15, 1.25, 1.34] -> [1.12, 1.25, 1.36].
+ *  The reason is that a button that lets go and grabs again FARMS blues: with a
+ *  reachable tier 1 the same three laps banked 19 of them, and 19 blues at the
+ *  old table are worth more than the four purples they were collected instead
+ *  of. Trimming the bottom rung and stretching the top takes tier 3 from 2.1x
+ *  tier 1's duration to 3.2x, so a player choosing between "release now for a
+ *  safe blue" and "hold another second" is choosing correctly when they hold.
+ *  The strength column barely moves, deliberately: it sets the speed ceiling,
+ *  and past ~41 m/s the boost simply arrives at the next corner too fast to use.
  * ============================================================================
  */
-const DRIFT_BOOST_TIME = [0, 1.25, 1.85, 2.6];
-const DRIFT_BOOST_STRENGTH = [1, 1.15, 1.25, 1.34];
+const DRIFT_BOOST_TIME = [0, 0.95, 1.8, 3.0];
+const DRIFT_BOOST_STRENGTH = [1, 1.12, 1.25, 1.36];
 /**
  * Stick deflection needed, during the hop, to turn it into a slide.
  *
@@ -826,7 +877,13 @@ export class Kart implements IKart {
 
   constructor(
     readonly id: number,
-    readonly isPlayer: boolean,
+    /**
+     * Not `readonly`: `Race.selectKart` moves this flag between two existing
+     * karts when the player picks from the roster. `id` stays fixed because the
+     * AI keys its driver/band/assist maps off it and projectiles record it as
+     * an owner — reassigning ids would orphan all of that.
+     */
+    public isPlayer: boolean,
     readonly stats: KartStats,
   ) {
     const built = buildKart(stats);
@@ -1088,6 +1145,10 @@ export class Kart implements IKart {
   /** steer -1..1, throttle 0..1, brake 0..1 */
   step(ctx: Ctx, dt: number, steer: number, throttle: number, brake: number, wantDrift: boolean) {
     this.track = ctx.track;
+    // Eagerly, so the 512 samples land on the first frame of the countdown
+    // rather than inside the first corner the player drifts. One reference
+    // comparison per frame; see `buildCornerTable`.
+    if (cornerTableFor !== ctx.track) buildCornerTable(ctx.track);
     if (this.respawnPending) this.doRespawn(ctx);
     if (!Number.isFinite(dt)) return;
     dt = clamp(dt, 1 / 480, 1 / 20);

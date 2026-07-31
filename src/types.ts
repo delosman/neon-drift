@@ -260,6 +260,20 @@ export interface IRace extends System {
   /** completed lap times for the player, seconds */
   readonly lapTimes: number[];
   readonly standings: IKart[];
+  /** Index into `karts` of the machine the human is driving. */
+  readonly selectedKart: number;
+  /**
+   * Hand the player a different kart from the roster. The select screen had no
+   * way to say this, so it moved a highlight and nothing else — every race was
+   * driven in kart 0 whatever the player clicked.
+   *
+   * Takes effect on the next `reset()`/`start()`. Karts are built once at
+   * `init` (the model, livery and driver are baked from `stats`), so this moves
+   * which existing kart is the player's rather than rebuilding anything, and
+   * the grid slot moves with it so picking the last racer does not start you
+   * last.
+   */
+  selectKart(index: number): void;
   start(): void;
   reset(): void;
   /**
