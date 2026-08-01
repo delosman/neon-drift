@@ -90,6 +90,68 @@ const ITEM_BUFFER = 0.11;
 /** seconds between rumble effects — a pad that is always buzzing says nothing */
 const RUMBLE_GAP = 0.055;
 
+// ---------------------------------------------------------------------------
+//  ASSISTS. Both live here rather than in `src/game/`, because `Input.update`
+//  already receives and stores `Ctx` and the existing contract already carries
+//  everything they need — `ITrack.sample` gives tangent/binormal/halfWidth and
+//  `IKart` gives position/forward/t/driftDir. No `types.ts` change.
+// ---------------------------------------------------------------------------
+
+/** Hard bound on the steering assist, as a fraction of full lock. */
+const ASSIST_CLAMP = 0.22;
+/** How much of the correction is "get back to the line" vs "point down it". */
+const ASSIST_LATERAL = 0.65;
+const ASSIST_HEADING = 0.35;
+/** radians of heading error that count as a full-scale heading term (~26 deg) */
+const ASSIST_HEADING_SCALE = 0.45;
+
+/**
+ * AUTO-DRIFT IS A STEER FLOOR AND NOTHING ELSE.
+ *
+ * It never enters a slide, never releases one, never writes `state.drift`, and
+ * — the part that matters — it does not preserve anything across a dip in steer
+ * or in slide angle. `DRIFT_CARRY_TIME` in `Kart.ts` is the ONLY carry window in
+ * this game and this is not a second one. Several rounds have "discovered" the
+ * carry problem and added a competing timer; the shape that avoids it is a
+ * floor that is armed by the DRIFT PRESS and expires on a clock, so there is no
+ * state for it to carry.
+ *
+ * `Kart` needs |steer| >= DRIFT_ENGAGE_STEER (0.13) to commit to a slide. At
+ * the new stick geometry that is 21.3 px of thumb travel, or 3.53 mm on an
+ * iPhone 14 at 6.04 px/mm. The floor is 0.16 — comfortably over the threshold,
+ * so it actually commits — and the graded setting scales the ARM, i.e. how
+ * little the player has to ask for before the floor takes over:
+ *
+ *     A = 0    arm never fires; 0.13 of command, 3.53 mm  (assist off)
+ *     A = 0.5  arm at 0.08;     15.6 px,         2.59 mm
+ *     A = 1    arm at 0.04;     10.5 px,         1.74 mm
+ *
+ * THE GRADE SCALES THE ARM, NOT THE FLOOR, and that is a correction made
+ * against a measurement rather than a preference. Scaling the FLOOR — the
+ * obvious reading, and the one this shipped with for an afternoon — puts the
+ * middle setting at 0.08, which is UNDER Kart's 0.13, so "Half" committed
+ * nothing at all: it was a menu option that did precisely nothing, verified by
+ * `input.state.steer` reading 0.0800 with DRIFT held. A graded assist whose
+ * middle grade is inert is worse than no grade.
+ *
+ * 0.9 s is long enough for the rack to wind past the threshold at any speed and
+ * short enough that it is gone before the corner is.
+ */
+const DRIFT_FLOOR = 0.16;
+const DRIFT_FLOOR_ARM = 0.04;
+const DRIFT_FLOOR_TIME = 0.9;
+
+// ---------------------------------------------------------------------------
+//  HAPTICS. `haptic()` drives a GAMEPAD; `pulse()` drives a PHONE. They are
+//  different devices taking different units and conflating them was a bug.
+// ---------------------------------------------------------------------------
+
+/** ms between pulse STARTS. 45 is the shortest gap two taps read as two taps. */
+const PULSE_GAP_MS = 45;
+/** rolling window and the share of it the motor may be running */
+const PULSE_WINDOW_MS = 2000;
+const PULSE_DUTY = 0.12;
+
 export class Input implements IInput {
   state: InputState = {
     steer: 0, accel: 0, brake: 0, accelAuto: false, drift: false, driftPressed: false,
@@ -113,7 +175,14 @@ export class Input implements IInput {
   private wasPause = false;
   private wasAny = false;
   private padIndex = -1;
-  private pad = new TouchControls();
+  /**
+   * PUBLIC deliberately. The controls screen in `src/ui/` needs to drive this —
+   * scheme, hand, assists, live preview — and `IInput` in `types.ts` may not be
+   * widened for it, so the UI reaches it through a cast on `ctx.input`. Making
+   * it public keeps that cast honest rather than a lie about a private field.
+   * `tools/touch-feel.mjs` also reads it, which is why the name is load-bearing.
+   */
+  readonly pad = new TouchControls();
   /** true once a finger has actually driven the on-screen pad */
   private padUsed = false;
 
@@ -133,6 +202,15 @@ export class Input implements IInput {
   private offBus: (() => void) | null = null;
   private rumbleCooldown = 0;
   private rumbleStrength = 0;
+  /** remaining seconds of the auto-drift steer floor */
+  private driftFloorT = 0;
+  /** `performance.now()` of the last pulse start, and its total energy */
+  private pulseAt = -1e9;
+  private pulseEnergy = 0;
+  /** rolling record of pulse (start, duration) for the duty-cycle budget */
+  private pulseLog: number[] = [];
+  /** REPORTED, for tools/haptic-bench.mjs: what the last correction was */
+  assistLast = 0;
 
   init(ctx: Ctx) {
     this.ctx = ctx;
@@ -166,26 +244,74 @@ export class Input implements IInput {
 
     this.blockPageGestures();
 
-    // Haptics. The bus is the only place impacts are announced, and it is
-    // fire-and-forget, so listening costs nothing when no pad is attached.
+    // Give the pad the one haptics gate, so a control-level tick obeys the same
+    // budget as a gameplay one rather than inventing a second path.
+    this.pad.pulse = (p) => this.pulse(p);
+
+    /**
+     * Haptics. The bus is the only place impacts are announced, and it is
+     * fire-and-forget, so listening costs nothing when nothing can vibrate.
+     *
+     * ROUND 15 — THE BUG THAT MADE THIS WHOLE SECTION USELESS ON A PHONE.
+     * `haptic(strong, weak, ms)` gated the `navigator.vibrate` path on
+     * `strong > 0.55`. `strong` is a GAMEPAD DUAL-RUMBLE MAGNITUDE, 0..1, and it
+     * was being used as a significance threshold for a phone's LRA, which takes
+     * a pulse LENGTH and has no magnitude at all. `boost` passed 0.28 and
+     * `drift-spark` 0.16, so THE TWO EVENTS THE ENTIRE DRIFT LOOP IS BUILT ON
+     * NEVER VIBRATED — while being hit by a shell (0.95) did. The game buzzed
+     * for the things that happen TO you and was silent for the things you EARN.
+     *
+     * The two devices are now driven separately: `haptic()` keeps the gamepad's
+     * magnitudes, `pulse()` takes a phone pattern in milliseconds.
+     */
     this.offBus = ctx.bus.on((e) => {
       switch (e.type) {
-        case 'collide':
-          if (e.kart.isPlayer) this.haptic(clamp01(e.impulse / 14), 0.35, 130);
+        case 'collide': {
+          if (!e.kart.isPlayer) break;
+          const k = clamp01(e.impulse / 14);
+          this.haptic(k, 0.35, 130);
+          this.pulse([Math.round(10 + 18 * k)]);
           break;
+        }
         case 'hit':
-          if (e.kart.isPlayer) this.haptic(0.95, 0.75, 220);
+          if (!e.kart.isPlayer) break;
+          this.haptic(0.95, 0.75, 220);
+          // The only other three-part pattern in the table, so being SHELLED is
+          // unmistakable from anything the player did on purpose.
+          this.pulse([24, 50, 24]);
           break;
-        case 'land':
-          if (e.kart.isPlayer) this.haptic(clamp01(e.impact / 22), 0.2, 90);
+        case 'land': {
+          if (!e.kart.isPlayer) break;
+          const k = clamp01(e.impact / 22);
+          this.haptic(k, 0.2, 90);
+          // Below a third of the scale this is just driving over a kerb.
+          if (k >= 0.35) this.pulse([Math.round(8 + 14 * k)]);
           break;
+        }
         case 'boost':
-          if (e.kart.isPlayer) this.haptic(0.28, 0.75, 200);
+          if (!e.kart.isPlayer) break;
+          this.haptic(0.28, 0.75, 200);
+          this.pulse([28]);
+          break;
+        case 'item-use':
+          if (e.kart.isPlayer) this.pulse([14]);
           break;
         case 'drift-spark':
           // A tick on each mini-turbo tier change. Tier 0 is drift ENTRY and
-          // fires on every corner, so it is deliberately left silent.
-          if (e.kart.isPlayer && e.tier > 0) this.haptic(0.16, 0.5, 55);
+          // fires on every corner, so it is deliberately left silent — that is
+          // the difference between feedback and a permanent buzz.
+          if (!e.kart.isPlayer || e.tier <= 0) break;
+          this.haptic(0.16, 0.5, 55);
+          // Tier 3 is a double-tap: "this is the big one", told in rhythm
+          // rather than in intensity, because an LRA has no intensity.
+          this.pulse(e.tier >= 3 ? [10, 40, 22] : e.tier === 2 ? [16] : [12]);
+          break;
+        case 'countdown':
+          // GO only. Four beats were tried and are a buzz, not a cue — and this
+          // one pulse still supplies the user activation Chrome requires before
+          // it will honour `vibrate` at all, which is the real reason the
+          // countdown is in the table.
+          if (e.n === 0) this.pulse([26]);
           break;
       }
     });
@@ -338,14 +464,58 @@ export class Input implements IInput {
         });
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch { /* an actuator that refuses is not an error worth surfacing */ }
-      return;
     }
-    // No pad. Phones that expose the Vibration API get a short pulse for real
-    // impacts only — a buzz on every drift tier would be intolerable in a hand.
-    // iOS Safari does not implement this, so it is a no-op there.
-    if (strong > 0.55 && typeof navigator.vibrate === 'function') {
-      try { navigator.vibrate(Math.min(40, Math.round(ms * 0.15))); } catch { /* ignore */ }
+  }
+
+  /**
+   * A phone pulse, in milliseconds.
+   *
+   * `navigator.vibrate` takes a PATTERN — alternating on/off durations — and has
+   * no magnitude, which is why this is a separate function from `haptic()` and
+   * not a parameter of it. Three budgets, all of them the difference between
+   * feedback and an annoyance:
+   *
+   *  - **45 ms minimum between starts.** Two pulses closer than that are felt as
+   *    one; a stronger one may PRE-EMPT a weaker one (total pattern energy), so
+   *    a shell hit is never lost behind a drift tick.
+   *  - **Under 12% duty over any rolling 2 s.** The failure this prevents is not
+   *    a single event, it is a pile-up — a bumped, boosting, tier-climbing kart
+   *    can raise five of these in half a second, and a motor that is running
+   *    most of the time says nothing at all and eats the battery doing it.
+   *  - **Every call wrapped.** `vibrate` can throw on a page without user
+   *    activation and is simply absent in Safari.
+   *
+   * NOTE, plainly: **iOS Safari does not implement `navigator.vibrate`**, so
+   * everything below lands on Android and on desktop Chrome and nowhere else.
+   * That is why no feedback in this game is haptic-ONLY — every event in the
+   * table above also has a visual or an audible channel. The iOS
+   * checkbox-switch trick is deliberately NOT shipped: Apple patched it in 26.5,
+   * it was always a hack against the platform's intent, and it is unnecessary
+   * given the rule above.
+   */
+  private pulse(pattern: number[]) {
+    if (this.touch && !this.pad.state.haptics) return;
+    if (typeof navigator.vibrate !== 'function') return;
+    const now = performance.now();
+    let energy = 0;
+    for (let i = 0; i < pattern.length; i += 2) energy += pattern[i];
+    if (energy <= 0) return;
+
+    // Gap, with stronger-pre-empts-weaker.
+    if (now - this.pulseAt < PULSE_GAP_MS && energy <= this.pulseEnergy) return;
+
+    // Duty cycle over the rolling window. The log is pairs of (start, ms).
+    let spent = 0;
+    for (let i = this.pulseLog.length - 2; i >= 0; i -= 2) {
+      if (this.pulseLog[i] < now - PULSE_WINDOW_MS) { this.pulseLog.splice(0, i + 2); break; }
+      spent += this.pulseLog[i + 1];
     }
+    if (spent + energy > PULSE_WINDOW_MS * PULSE_DUTY) return;
+
+    this.pulseAt = now;
+    this.pulseEnergy = energy;
+    this.pulseLog.push(now, energy);
+    try { navigator.vibrate(pattern.length === 1 ? pattern[0] : pattern); } catch { /* ignore */ }
   }
 
   // ---------------------------------------------------------------------------
@@ -388,13 +558,20 @@ export class Input implements IInput {
 
     // --- on-screen pad, if this is a touch device ----------------------------
     if (this.touch) {
-      this.pad.update();
+      this.pad.update(ctx, dt);
       const t = this.pad.state;
       if (t.active) { this.padUsed = true; acted = true; }
       // `steering`, not `steer !== 0`: a thumb parked inside the dead zone is
       // asking for straight-ahead RIGHT NOW, and should get it immediately
-      // rather than coasting back through the digital return ramp.
+      // rather than coasting back through the digital return ramp. It also
+      // stays true through the pad's own release ramp, so the digital return
+      // branch below has stopped being load-bearing for touch.
       if (t.steering) analogue = t.steer;
+      // The `buttons` scheme deliberately reports a DIGITAL request instead of
+      // an axis, so the invented axis is invented exactly once — here, by the
+      // same ramp the keyboard uses. Two rate limiters in series is the
+      // documented "mushy" failure and this is how it is avoided.
+      if (t.digital !== 0) { digital = t.digital; acted = true; }
       // Sticky within the frame: a keyboard or gamepad throttle is a real
       // decision and outranks the assist, so only claim `auto` if the assist
       // is the ONLY thing asking for throttle.
@@ -461,6 +638,20 @@ export class Input implements IInput {
     }
     if (digital !== 0) acted = true;
 
+    // --- steering assist -------------------------------------------------------
+    // Folded into `state.steer` BEFORE publication, so it stays in the input
+    // frame and `Kart.ts` still performs the one and only handedness negation.
+    this.assistLast = this.steerAssist(ctx, s.steer);
+    if (this.assistLast !== 0) {
+      const out = s.steer + this.assistLast;
+      // Never takes the wheel away: the assist may add to what the player asked
+      // for and may pull them back toward the line, but it may not push the
+      // command through centre and steer the other way.
+      s.steer = s.steer !== 0 && Math.sign(out) !== Math.sign(s.steer)
+        ? 0
+        : out < -1 ? -1 : out > 1 ? 1 : out;
+    }
+
     // --- drift: minimum hold ---------------------------------------------------
     // A tap must survive long enough for `Kart` to have wound the steering rack
     // past the 0.2 it demands before it will commit to a slide. Armed on the
@@ -469,6 +660,22 @@ export class Input implements IInput {
     if (drift && !this.wasDrift) this.driftMin = DRIFT_MIN_HOLD;
     else if (this.driftMin > 0) this.driftMin -= dt;
     if (this.driftMin > 0) drift = true;
+
+    // --- auto-drift: a steer FLOOR, armed by the drift press --------------------
+    // It never enters a slide, never releases one and never writes `drift`, so
+    // it cannot become a second `DRIFT_CARRY_TIME`. See the constants.
+    if (drift && !this.wasDrift) this.driftFloorT = DRIFT_FLOOR_TIME;
+    else if (this.driftFloorT > 0) this.driftFloorT -= dt;
+    const dA = this.touch ? this.pad.state.driftAssist : 0;
+    if (drift && dA > 0 && this.driftFloorT > 0) {
+      const mag = Math.abs(s.steer);
+      // ARM: the player has to have asked for a DIRECTION. A floor applied to a
+      // dead-centre stick would pick a side for them, which is a different
+      // feature and a much worse one. The grade scales this, not the floor —
+      // see the constants for the measurement that decided it.
+      const arm = DRIFT_FLOOR_ARM / dA;
+      if (mag >= arm && mag < DRIFT_FLOOR) s.steer = Math.sign(s.steer) * DRIFT_FLOOR;
+    }
 
     s.accel = accel;
     s.accelAuto = accelAuto;
@@ -518,6 +725,52 @@ export class Input implements IInput {
 
     // One frame of visibility per press, then gone.
     this.latched.clear();
+  }
+
+  /**
+   * The steering assist, in the input frame.
+   *
+   *   lateral    = (player.position - sample.pos) . sample.binormal   (+ = right of line)
+   *   heading    = signed angle from sample.tangent to player.forward (+ = pointing right)
+   *   target     = -(0.65 * lateral/halfWidth + 0.35 * heading/0.45)
+   *   correction = A * (1 - |steer|)^2 * target,  clamped to +/- 0.22
+   *
+   * The `(1 - |s|)^2` envelope is "never takes the wheel away" written as a C1
+   * curve rather than as a cliff: 25% of authority at half input, EXACTLY zero
+   * at full lock, and no step anywhere for the thumb to feel. A bare clamp was
+   * the alternative and is worse — it hands authority back abruptly at whatever
+   * threshold it is set to, and a player leaning into a corner crosses that
+   * threshold every single time.
+   *
+   * THE SINGLE MOST IMPORTANT LINE IN THIS FUNCTION is the `driftDir !== 0`
+   * kill. An assist that fights a held slide destroys the mini-turbo ladder,
+   * which is this game's stated top priority. Gating on `driftTier >= 1` — the
+   * obvious-looking test — is NOT sufficient, because `driftTier` is still 0
+   * for the whole charge phase: precisely the window an assist would spend
+   * fighting `DRIFT_TURN_ASSIST` and costing the boost.
+   */
+  private steerAssist(ctx: Ctx, steer: number): number {
+    const A = this.touch ? this.pad.state.steerAssist : 0;
+    if (A <= 0) return 0;
+    const race = ctx.race;
+    const track = ctx.track;
+    const p = race?.player;
+    if (!p || !track || race.state !== RaceState.Racing) return 0;
+    if (p.driftDir !== 0) return 0;
+
+    const s = track.sample(p.t);
+    const px = p.position.x - s.pos.x, py = p.position.y - s.pos.y, pz = p.position.z - s.pos.z;
+    const lateral = px * s.binormal.x + py * s.binormal.y + pz * s.binormal.z;
+    const f = p.forward;
+    const heading = Math.atan2(
+      f.x * s.binormal.x + f.y * s.binormal.y + f.z * s.binormal.z,
+      f.x * s.tangent.x + f.y * s.tangent.y + f.z * s.tangent.z,
+    );
+    const hw = s.halfWidth > 0.001 ? s.halfWidth : 1;
+    const target = -(ASSIST_LATERAL * (lateral / hw) + ASSIST_HEADING * (heading / ASSIST_HEADING_SCALE));
+    const env = (1 - Math.min(1, Math.abs(steer))) ** 2;
+    const c = A * env * target;
+    return c < -ASSIST_CLAMP ? -ASSIST_CLAMP : c > ASSIST_CLAMP ? ASSIST_CLAMP : c;
   }
 
   /**

@@ -518,12 +518,38 @@
 /* Only while a slide is live. During a boost the rail means "time left", which
    has no rungs, and a scale over it would be a lie. */
 .kr-charge.drifting .kr-charge-e::after { opacity: 1; }
-.kr-charge-e.l { left: 0; transform-origin: 0% 50%;
+/* DEFECT D4, HALF ONE: THE RAILS HAD NO env() TERM AT ALL.
+   `left: 0` / `right: 0` on a 30 px-wide element, against landscape safe-area
+   insets of 47 px (iPhone 14/15), 50 px (13 mini) and 59 px (15 Pro Max) — so
+   the whole ladder was 100% behind the notch on three shipping iPhones, and the
+   masks below fade OUTWARD from the frame edge, which put the BRIGHTEST part of
+   the rail furthest under the cutout. The failure was an ABSENT number, not a
+   wrong one, which is why it survived every review: nothing looked off, because
+   on a device with no inset nothing WAS off.
+   `+ 8px` on top of the inset keeps a hair of gap on a device that reports 0. */
+.kr-charge-e.l { left: calc(env(safe-area-inset-left, 0px) + 8px); transform-origin: 0% 50%;
   -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.5) 38%, transparent 100%);
           mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.5) 38%, transparent 100%); }
-.kr-charge-e.r { right: 0; transform-origin: 100% 50%;
+.kr-charge-e.r { right: calc(env(safe-area-inset-right, 0px) + 8px); transform-origin: 100% 50%;
   -webkit-mask-image: linear-gradient(to left, #000 0%, rgba(0, 0, 0, 0.5) 38%, transparent 100%);
           mask-image: linear-gradient(to left, #000 0%, rgba(0, 0, 0, 0.5) 38%, transparent 100%); }
+
+/* DEFECT D4, HALF TWO: ON TOUCH THE RAIL IS SHORTENED, NOT INVERTED.
+   The bottom of the frame is the grip band — the hand is there for the whole
+   lap, and on the right it is holding down DRIFT, which is the button that
+   earned the rail in the first place. Measured: DRIFT covered 18.3 of the right
+   rail's 30 px.
+   The rail box now ends at 46% of the frame height, so at tier-1 fill (0.333)
+   the leading cap lands at ~0.37H and at fill 0.15 at ~0.47H — both clear of
+   the 0.55H grip band at every fill a player can actually hold.
+   Growth stays BOTTOM-UP. Inverting it top-down was the alternative and is
+   rejected: it would teach two opposite metaphors for one number, since the
+   desktop rail grows upward and the two must never disagree. The rungs stay
+   meaningful because they are fixed to the rail BOX, not to the frame. */
+html[data-touch] .kr-charge-e {
+  top: calc(env(safe-area-inset-top, 0px) + 4%);
+  bottom: 46%;
+}
 
 /* The rail itself. Two layers on ONE element so both move together: a warm
    scrim (the same #170e0a-family ink as every plate) under a tier ramp with a
@@ -1221,6 +1247,52 @@
    same .82 that rule uses; if that number ever changes, change it here too. */
 html[data-touch] .kr .kr-speed { --speed-s: 0.82; transform: scale(var(--speed-s)); }
 
+/* THE ITEM PLATE MOVES INTO THE TOP RAIL ON TOUCH.
+   It used to keep its desktop bottom-left home, justified by a comment saying
+   the floating stick "can safely overlap it for the moment a thumb is actually
+   down there". With auto-accelerate on and drift held, THE THUMB IS DOWN FOR
+   THE WHOLE LAP — and measured at the modal thumb landing (25 mm / 35 deg from
+   the left pivot) the plate is 100% occluded on both the iPhone 14 and the
+   15 Pro Max. The stick base is translucent; a thumb is not, and no z-index
+   fixes flesh.
+   Top-left rail, after the lap plate and after TouchControls' PAUSE/AUTO chips
+   (which start at env + 26vmin and run about 102 px), and clear of the minimap
+   at frame centre: on an iPhone 14 the plate lands at x 215-299 against the
+   minimap's left edge at 353. Square, so a wide `--rail` cannot reach it. */
+html[data-touch] .kr .kr-item {
+  bottom: auto;
+  top: env(safe-area-inset-top, 0px);
+  left: calc(env(safe-area-inset-left, 0px) + 26vmin + 112px);
+  width: var(--rail-top);
+  height: var(--rail-top);
+  --clip: var(--clip-br);
+}
+/* THE TOP RAIL DOES NOT MIRROR, AND THAT IS THE POINT.
+   The obvious "mirror everything" put the AUTO/PAUSE chips and the item plate
+   at 26 vmin from the RIGHT edge, i.e. straight through the race timer, which
+   the HUD keeps top-right in both modes. Mirror what the THUMBS touch — the
+   steering source, the action cluster and the two plates the cluster would sit
+   on — and leave the read-only top rail where the HUD put it. Caught by
+   looking at a left-handed capture; nothing in the harnesses covers it, which
+   is exactly the division of labour CLAUDE.md describes.
+
+   What DOES have to move: the speedometer and the position plate. In
+   right-handed mode the speedometer is pushed left of the cluster and the
+   position plate sits at left-centre where only a translucent stick base ever
+   overlaps it. Mirrored, the cluster lands on the position plate — five opaque
+   discs over the live rival gap — and the bottom-right corner it vacated is
+   empty, which is where the speedometer belongs anyway. */
+html[data-touch][data-touch-hand="left"] .kr .kr-speed {
+  right: 0;
+  transform-origin: 100% 100%;
+}
+html[data-touch][data-touch-hand="left"] .kr .kr-pos {
+  left: auto;
+  right: 0;
+  align-items: flex-end;
+  --clip: var(--clip-bl);
+}
+
 .kr-speed-face { --clip: var(--clip-tl); position: absolute; inset: 0; transform-origin: 100% 100%; }
 .kr-speed-face canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* Peaked at 83 ms — five frames after the tier landed. A punch that arrives
@@ -1579,6 +1651,68 @@ html[data-touch] .kr .kr-speed { --speed-s: 0.82; transform: scale(var(--speed-s
 @keyframes kr-breathe {
   0%, 100% { opacity: 0.42; transform: scale(0.99); }
   50%      { opacity: 1; transform: scale(1.01); }
+}
+
+/* DEFECT D6 — the touch onboarding row.
+   Three miniature renderings of the ACTUAL controls, at their actual colours,
+   one word each at >= 14 px and full opacity. It replaces a 9 px line at 44%
+   opacity that named the controls without showing where any of them were.
+   Nothing to read; the shapes are the shapes that are about to be on screen. */
+.kr-glyphs {
+  display: flex;
+  gap: clamp(14px, 3.4vmin, 40px);
+  margin-top: 1.6vmin;
+  align-items: flex-start;
+}
+.kr-glyphs:empty { display: none; }
+.kr-gl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(14px, 1.9vmin, 20px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(248, 242, 230, 0.86);
+}
+.kr-gl > span {
+  position: relative;
+  width: clamp(38px, 6.4vmin, 62px);
+  height: clamp(38px, 6.4vmin, 62px);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: clamp(8px, 1.35vmin, 13px);
+  letter-spacing: 0.05em;
+  color: #f4f7fb;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.16), rgba(9, 15, 27, 0.52) 72%);
+}
+.kr-gl-stick i,
+.kr-gl-stick b { position: absolute; border-radius: 50%; }
+.kr-gl-stick i { inset: 0; border: 2px solid rgba(255, 255, 255, 0.42); }
+.kr-gl-stick b {
+  width: 42%; height: 42%; left: 46%; top: 29%;
+  background: radial-gradient(circle at 40% 35%, #fff, #ffd98a 55%, #f0a93c 100%);
+}
+/* The same blue the DRIFT button and the mini-turbo sparks use — the glyph is
+   the control, so it cannot be a different colour from the control. */
+.kr-gl-drift {
+  background: radial-gradient(circle at 50% 36%, rgba(120, 220, 255, 0.42), rgba(12, 52, 84, 0.62) 72%) !important;
+  border-color: rgba(150, 230, 255, 0.72) !important;
+}
+.kr-gl-item { font-size: clamp(16px, 2.6vmin, 26px) !important; font-weight: 400; }
+
+/* 46 px tall, because it is a real target on a phone — but narrow, because it
+   must not compete with "Tap to Start". A player who never presses this gets a
+   good default; a player who needs another scheme must be able to find it. */
+.kr-btn-controls {
+  margin-top: 1.4vmin;
+  min-height: 46px;
+  padding: 0 1.6em;
+  font-size: clamp(11px, 1.6vmin, 15px);
+  opacity: 0.82;
 }
 
 .kr-hint {

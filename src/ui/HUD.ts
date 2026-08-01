@@ -171,6 +171,8 @@ export class HUD implements System {
   private lastTier = 0;
   /** the tier class currently on the rail element, so it is written on change */
   private railTier = -1;
+  /** last value written to html[data-drift-tier]; null = attribute absent */
+  private driftTierAttr: string | null = null;
   private lastDir = 0;
   private prevRaceTime = 0;
 
@@ -923,6 +925,41 @@ export class HUD implements System {
     setNum(this.charge, '--fill', fill, 0.004);
     setStyle(this.charge, '--cc', body);
     setStyle(this.charge, '--cn', cap);
+    /**
+     * THE SAME THREE FACTS, ON THE ROOT ELEMENT, FOR THE TOUCH LAYER.
+     *
+     * The screen-edge rails answer "what am I holding?" for a player looking
+     * down the road. They cannot answer it for a player whose own thumb is on
+     * the DRIFT button, because a thumb pad is 10-14 mm of opaque flesh and no
+     * z-index fixes flesh. `TouchControls` draws a halo OUTSIDE that button,
+     * and it needs exactly these numbers.
+     *
+     * Written to `documentElement` rather than passed through an API, because
+     * this is already-cached custom-property writes that the compositor
+     * consumes: no new per-frame work, no cross-module dependency in either
+     * direction, and no `types.ts` change. The rail and the halo therefore
+     * carry the same fact from the same source and cannot disagree by even one
+     * frame — which is the property that makes two indicators legitimate
+     * instead of confusing.
+     *
+     * Touch only: on desktop this would be three style writes a frame for an
+     * element nobody is drawing.
+     */
+    if (ctx.input.touch) {
+      const de = document.documentElement;
+      setNum(de, '--fill', fill, 0.004);
+      setStyle(de, '--cc', body);
+      setStyle(de, '--cn', cap);
+      // The ATTRIBUTE, not a class: re-matching an attribute selector restarts
+      // the halo's tier-up flare with no class bookkeeping, and its absence is
+      // what hides the halo entirely when nothing is charging.
+      const want = drifting ? String(tier) : boosting ? 'b' : null;
+      if (this.driftTierAttr !== want) {
+        this.driftTierAttr = want;
+        if (want === null) de.removeAttribute('data-drift-tier');
+        else de.setAttribute('data-drift-tier', want);
+      }
+    }
     setNum(this.charge, 'opacity', this.railOn, 0.01);
     this.charge.classList.toggle('drifting', drifting);
     this.charge.classList.toggle('boosting', !drifting && boosting);

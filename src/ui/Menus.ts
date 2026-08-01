@@ -12,6 +12,7 @@
  */
 import { RaceState, type Ctx, type IKart, type KartStats } from '../types';
 import { el, formatClock, ordinalSuffix, cssColor, clamp } from './uiUtil';
+import { ControlsMenu } from './ControlsMenu';
 
 export type ScreenName = 'none' | 'title' | 'select' | 'pause' | 'results';
 
@@ -157,6 +158,14 @@ export class Menus {
   private finishTimes = new Map<number, number>();
   private lastRaceTime = 0;
 
+  /** the controls screen — its own overlay, not one of the four `screens` */
+  private controls: ControlsMenu;
+  /** title-screen copy follows the device actually in use; see `syncTouchCopy` */
+  private titlePrompt!: HTMLDivElement;
+  private titleHint!: HTMLDivElement;
+  private titleGlyphs!: HTMLDivElement;
+  private touchCopy: boolean | null = null;
+
   private rosterEl!: HTMLDivElement;
   private standingsEl!: HTMLDivElement;
   /** the in-race running order, shown on the pause screen (see buildPause) */
@@ -168,6 +177,10 @@ export class Menus {
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'kr-screens', parent);
+    // Sibling of `.kr-screens`, not a child: the tap-anywhere-confirm listener
+    // below is on `this.root`, and a tap on a SETTING must not also start the
+    // race. Its own listeners stop propagation before the touch pad sees it.
+    this.controls = new ControlsMenu(parent);
     this.screens = {
       title: this.buildTitle(),
       select: this.buildSelect(),
@@ -203,6 +216,7 @@ export class Menus {
       if (e.type === 'finish') this.finishTimes.set(e.kart.id, ctx.race.raceTime);
     });
     this.fillRoster(ctx);
+    this.controls.attach(ctx);
   }
 
   // ------------------------------------------------------------------ frame
@@ -218,6 +232,20 @@ export class Menus {
       this.finishTimes.clear();
     }
     this.lastRaceTime = race.raceTime;
+
+    // The title copy follows the device actually in use, and `input.touch` can
+    // flip mid-session (the iPadOS lazy mount, or a keyboard being pressed on a
+    // tablet). Cached on the value, so this is a compare per frame.
+    this.syncTouchCopy(ctx.input.touch);
+
+    // The controls screen owns input while it is up: it is a sibling overlay,
+    // not one of the four screens, so nothing below it may act on a confirm.
+    this.controls.update(ctx);
+    if (this.controls.open) {
+      this.tapConfirm = false;
+      this.prevSteer = input.steer;
+      return;
+    }
 
     const inRace = race.state === RaceState.Racing || race.state === RaceState.Countdown;
 
@@ -389,17 +417,52 @@ export class Menus {
     wrap.style.alignItems = 'center';
     wrap.innerHTML = LOGO_SVG.replace('RAYS', buildRays());
     el('div', 'kr-sub', wrap, 'Sunset Bay Circuit');
-    // The prompt and the hints follow the input device actually in use — a phone
-    // has no Enter key, and telling a player to press one is how the title
-    // screen becomes a dead end.
-    const touch = matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
-    el('div', 'kr-prompt', wrap, touch ? 'Tap to Start' : 'Press Enter to Start');
-    const hint = el('div', 'kr-hint', wrap);
-    hint.innerHTML = touch
-      ? '<b>Left thumb</b> steer &nbsp;&nbsp; <b>Drift</b> slide &nbsp;&nbsp; <b>Item</b> fire'
-      : '<b>&#8592;</b><b>&#8594;</b> steer &nbsp;&nbsp; <b>&#8593;</b> accelerate &nbsp;&nbsp; ' +
-        '<b>Shift</b> drift &nbsp;&nbsp; <b>Space</b> item &nbsp;&nbsp; <b>Esc</b> pause';
+    // Built empty; `syncTouchCopy` fills it from `ctx.input.touch` every time
+    // that flips. This used to run its OWN `matchMedia('(pointer: coarse)')`
+    // probe once, in the constructor — which is exactly the check that fails on
+    // the documented iPadOS "Request Desktop Website" case, where Safari claims
+    // `pointer: fine` and `maxTouchPoints: 0`. `Input` already handles that with
+    // a lazy capture-phase mount on the first real finger; the menu copy was
+    // never brought along, so an iPad in desktop mode got on-screen controls and
+    // the words "Press Enter to Start" above them.
+    this.titlePrompt = el('div', 'kr-prompt', wrap);
+    this.titleGlyphs = el('div', 'kr-glyphs', wrap);
+    this.titleHint = el('div', 'kr-hint', wrap);
+    const cbtn = el('div', 'kr-btn kr-btn-controls', wrap, 'Controls');
+    cbtn.onclick = (e) => { e.stopPropagation(); this.controls.show(); };
+    this.syncTouchCopy(false);
     return s;
+  }
+
+  /**
+   * DEFECT D6. The only touch onboarding was one line of `kr-hint` at
+   * `clamp(9px, 1.4vmin, 18px)` — 1.4 vmin is 5.5 px on a 390-tall phone so it
+   * clamped to 9 px — at 44% opacity: 1.5 mm of glyph, NAMING controls without
+   * showing where any of them are, while the floating stick is invisible at
+   * rest. A first-run player had no visual evidence a steering control existed.
+   *
+   * On touch that line is replaced by three miniature renderings of the ACTUAL
+   * controls at their actual colours, each with one word beneath it at >= 14 px
+   * and full opacity. Same information; nothing to read. The breathing ghost
+   * stick in `TouchControls` is the other half of this, and it is on the frame
+   * the player is looking at rather than on a screen they are leaving.
+   */
+  private syncTouchCopy(touch: boolean) {
+    if (this.touchCopy === touch) return;
+    this.touchCopy = touch;
+    this.titlePrompt.textContent = touch ? 'Tap to Start' : 'Press Enter to Start';
+    if (touch) {
+      this.titleGlyphs.innerHTML =
+        '<div class="kr-gl"><span class="kr-gl-stick"><i></i><b></b></span>Steer</div>' +
+        '<div class="kr-gl"><span class="kr-gl-drift">DRIFT</span>Slide</div>' +
+        '<div class="kr-gl"><span class="kr-gl-item">+</span>Fire</div>';
+      this.titleHint.innerHTML = '';
+    } else {
+      this.titleGlyphs.innerHTML = '';
+      this.titleHint.innerHTML =
+        '<b>&#8592;</b><b>&#8594;</b> steer &nbsp;&nbsp; <b>&#8593;</b> accelerate &nbsp;&nbsp; ' +
+        '<b>Shift</b> drift &nbsp;&nbsp; <b>Space</b> item &nbsp;&nbsp; <b>Esc</b> pause';
+    }
   }
 
   private buildSelect() {
@@ -494,6 +557,11 @@ export class Menus {
       this.forced = null;
       this.ctx?.race.setPaused(false);
     };
+    // Reachable MID-RACE, deliberately. `setScheme` releases every pointer and
+    // zeroes the command and never touches `IRace`, so a player who cannot
+    // steer can fix that without abandoning the race they are in.
+    const ctrl = el('div', 'kr-btn', list, 'Controls');
+    ctrl.onclick = () => this.controls.show();
     const restart = el('div', 'kr-btn', list, 'Restart race');
     restart.onclick = () => { this.localPause = false; this.forced = null; this.startRace(this.ctx); };
     const quit = el('div', 'kr-btn', list, 'Quit to title');
@@ -504,7 +572,7 @@ export class Menus {
       this.selecting = false;
       this.ctx.race.reset();
     };
-    this.buttons.pause = [resume, restart, quit];
+    this.buttons.pause = [resume, ctrl, restart, quit];
     return s;
   }
 
