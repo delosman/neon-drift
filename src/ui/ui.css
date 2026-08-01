@@ -1257,12 +1257,29 @@ html[data-touch] .kr .kr-speed { --speed-s: 0.82; transform: scale(var(--speed-s
    fixes flesh.
    Top-left rail, after the lap plate and after TouchControls' PAUSE/AUTO chips
    (which start at env + 26vmin and run about 102 px), and clear of the minimap
-   at frame centre: on an iPhone 14 the plate lands at x 215-299 against the
-   minimap's left edge at 353. Square, so a wide `--rail` cannot reach it. */
+   at frame centre.
+
+   THE `min()` IS THE WHOLE POINT, and it replaces a hand-measured gap that did
+   not survive contact with a real phone. The first version was a bare
+   `calc(env(...) + 26vmin + 112px)`, justified by measuring one device: "the
+   plate lands at x 215-299 against the minimap's left edge at 353". That gap
+   is a coincidence of one viewport's vmin, one notch inset and one `--map-w`,
+   and all three vary. This plate is anchored to the LEFT EDGE while the minimap
+   is anchored to the CENTRE, so any change in width, inset or map size closes
+   the gap from one side without the other knowing. On a notched iPhone in
+   landscape the inset pushed the plate right until it slid under the map.
+
+   So the offset is now a preference, not a promise: take the laid-out position
+   OR the rightmost position that still clears the minimap by 12px, whichever
+   is further left. Collision is impossible by construction rather than by
+   arithmetic that has to be redone whenever a constant moves. */
 html[data-touch] .kr .kr-item {
   bottom: auto;
   top: env(safe-area-inset-top, 0px);
-  left: calc(env(safe-area-inset-left, 0px) + 26vmin + 112px);
+  left: min(
+    calc(env(safe-area-inset-left, 0px) + 26vmin + 112px),
+    calc(50% - (var(--map-w) / 2) - 12px - var(--rail-top))
+  );
   width: var(--rail-top);
   height: var(--rail-top);
   --clip: var(--clip-br);
