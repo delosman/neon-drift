@@ -46,6 +46,7 @@ import './ui.css';
 import { BASE_TOP_SPEED, ItemKind, RaceState, type Ctx, type IKart, type System } from '../types';
 import { Minimap } from './Minimap';
 import { Menus } from './Menus';
+import { RACE_LAPS } from '../world/TrackLayout';
 import { ItemIconAtlas, ITEM_NAMES, ITEM_TINT, ROULETTE_ORDER } from './ItemIcons';
 import {
   Spring, TIER_COLORS, clamp, cssColor, damp, el, formatClock, formatDelta,
@@ -359,7 +360,9 @@ export class HUD implements System {
     const tl = el('div', 'kr-tl', this.hud);
     this.lapWrap = el('div', 'kr-lap', tl);
     this.lapIn = el('div', 'kr-lap-in', this.lapWrap);
-    el('div', 'kr-label', this.lapIn, 'Lap');
+    // A sprint has no lap arithmetic to show: the plate carries the event
+    // name instead of a 1/1 that reads as a bug.
+    el('div', 'kr-label', this.lapIn, RACE_LAPS === 1 ? 'Sprint' : 'Lap');
     const lap = this.cased(this.lapIn, 'kr-lap-nums', '', (l) => {
       const cur = el('span', 'kr-lap-cur', l, '1');
       el('span', 'kr-lap-sep', l, '/');
@@ -368,6 +371,7 @@ export class HUD implements System {
     });
     this.lapCur = lap.parts[0];
     this.lapTot = lap.parts[1];
+    if (RACE_LAPS === 1) this.lapWrap.classList.add('sprint');
 
     this.split = el('div', 'kr-split', tl);
     const pill = el('div', 'kr-pill', this.split);

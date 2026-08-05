@@ -24,7 +24,6 @@
 import * as THREE from 'three';
 import {
   BASE_TOP_SPEED,
-  LAP_COUNT,
   RACER_COUNT,
   RaceState,
   Surface,
@@ -33,6 +32,7 @@ import {
   type IRace,
   type KartStats,
 } from '../types';
+import { RACE_LAPS } from '../world/TrackLayout';
 import { Kart } from '../kart/Kart';
 import { AIField, type DriveCmd } from './AI';
 import { Items } from './Items';
@@ -149,7 +149,8 @@ export class Race implements IRace {
 
   karts: Kart[] = [];
   player!: Kart;
-  totalLaps = LAP_COUNT;
+  // Per-circuit: 3 for the circuits, 1 for a sprint event.
+  totalLaps = RACE_LAPS;
   raceTime = 0;
   countdown = 3;
   lapTimes: number[] = [];

@@ -1849,7 +1849,11 @@ html[data-touch][data-touch-hand="left"] .kr .kr-pos {
   background: linear-gradient(180deg, #ffe0f6, #ff7ad4);
 }
 
-/* track-select cards: two wide cards, one line of circuit character each */
+/* sprint events: the lap plate names the event; there is no x/y to count */
+.kr-lap.sprint .kr-lap-nums { display: none; }
+.kr-lap.sprint .kr-label { font-size: clamp(11px, 1.7vmin, 21px); letter-spacing: 0.18em; }
+
+/* track-select cards: wide cards, one line of circuit character each */
 .kr-card-tag {
   margin-top: 0.7vmin;
   font-size: clamp(10px, 1.4vmin, 17px);
@@ -1857,7 +1861,8 @@ html[data-touch][data-touch-hand="left"] .kr .kr-pos {
   color: rgba(255, 252, 244, 0.62);
   line-height: 1.35;
 }
-.kr-s-track .kr-roster { grid-template-columns: repeat(2, minmax(0, 30vmin)); justify-content: center; }
+.kr-s-track .kr-roster { grid-template-columns: repeat(3, minmax(0, 28vmin)); justify-content: center; }
+@media (max-aspect-ratio: 1/1) { .kr-s-track .kr-roster { grid-template-columns: repeat(1, minmax(0, 60vmin)); } }
 
 .kr-stats { margin-top: 1vmin; display: flex; flex-direction: column; gap: 0.55vmin; }
 .kr-stat { display: grid; grid-template-columns: 4.6em 1fr; align-items: center; gap: 0.6em; }

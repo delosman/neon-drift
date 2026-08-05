@@ -80,6 +80,13 @@ export interface TrackDef {
   dressLabel: string;
   /** which set of bespoke scenery dressers runs — see Scenery.init */
   kit: 'coastal' | 'gridline';
+  /**
+   * Race length in laps. 1 makes the event a SPRINT: one standing-start run
+   * from the line back round to it, presented without a lap counter. The
+   * engine's closed-loop invariants (cyclic centreline, checkpoints, AI line)
+   * are untouched — a sprint is a race that ends after the first tour.
+   */
+  laps: number;
   /** [length metres, heading change degrees] (negative = left) */
   legs: [number, number][];
   startHeading: number;
@@ -105,6 +112,7 @@ const SUNSET_BAY: TrackDef = {
   name: 'Sunset Bay Circuit',
   dressLabel: 'dressing the bay',
   kit: 'coastal',
+  laps: 3,
   legs: [
     [160, -13.85],  // 0.000 start straight — harbour boulevard
     [192, -102.06], // 0.100 harbour sweep
@@ -240,6 +248,7 @@ const NEON_HORIZON: TrackDef = {
   name: 'Neon Horizon GP',
   dressLabel: 'stringing the neon',
   kit: 'gridline',
+  laps: 3,
   legs: [
     [230, -16.95],  // 0.000 start straight
     [110, -100.03], // 0.163 T1 sweeping left
@@ -332,9 +341,133 @@ const NEON_HORIZON: TrackDef = {
 };
 
 // ===========================================================================
+//  SUMMIT SPRINT — one lap, flat out, over the mountain
+//
+//  A point-to-point event on a closed loop: a 2.17 km journey raced ONCE from
+//  a standing start. Seafront boulevard, a long left onto the lower ramp, two
+//  hairpin switchbacks climbing the face, a tunnel bored through the summit at
+//  54 m, then a plunging sweeper, a banked seafront curve and a flat-out drag
+//  back to the line. Leg turns min-norm Newton-solved (residual 2 cm) like the
+//  other circuits.
+// ===========================================================================
+const SUMMIT_SPRINT: TrackDef = {
+  id: 'summit-sprint',
+  name: 'Summit Sprint',
+  dressLabel: 'carving the summit',
+  kit: 'gridline',
+  laps: 1,
+  legs: [
+    [300, -15.48],  // 0.000 start boulevard on the seafront
+    [110, -88.78],  // 0.138 T1 long left onto the lower ramp
+    [180, 12.54],   // 0.189 lower ramp, gentle right drift
+    [85, -146.32],  // 0.272 switchback 1 (left hairpin)
+    [150, 8.94],    // 0.311 ramp 2
+    [85, 148.39],   // 0.380 switchback 2 (right hairpin)
+    [140, -8.84],   // 0.419 ramp 3
+    [90, -65.61],   // 0.484 summit approach left
+    [130, -13.04],  // 0.525 SUMMIT TUNNEL through the peak
+    [190, -92.33],  // 0.585 plunging descent sweeper left
+    [100, 38.43],   // 0.673 right flick mid-descent
+    [220, -66.46],  // 0.719 banked seafront curve
+    [90, -45.35],   // 0.820 harbour kink
+    [300, -37.81],  // 0.862 finish drag
+  ],
+  startHeading: 45,
+  elevation: [
+    [0.000, 4.0], [0.070, 4.6], [0.140, 6.0], [0.200, 11.0],
+    [0.270, 18.0], [0.310, 24.0], [0.380, 32.0], [0.420, 38.0],
+    [0.480, 46.0], [0.525, 52.0], [0.555, 54.0], [0.585, 52.5],
+    [0.640, 44.0], [0.700, 32.0], [0.760, 20.0], [0.820, 11.0],
+    [0.870, 7.0], [0.930, 4.6], [0.975, 4.0],
+  ],
+  halfWidth: [
+    [0.000, 8.8],   // eight-up standing start
+    [0.080, 8.4],
+    [0.140, 7.8],   // T1
+    [0.200, 7.2],
+    [0.270, 6.6],   // switchback 1 pinches
+    [0.310, 6.2],
+    [0.350, 6.6],
+    [0.419, 6.2],   // switchback 2
+    [0.460, 6.4],
+    [0.500, 6.0],   // summit approach
+    [0.527, 5.9],   // tunnel bore
+    [0.560, 6.1],
+    [0.590, 6.6],   // out of the mountain, opening
+    [0.640, 7.6],
+    [0.700, 8.0],
+    [0.740, 8.4],   // banked seafront — the passing lane
+    [0.820, 8.2],
+    [0.862, 7.2],   // harbour kink
+    [0.910, 7.6],
+    [0.960, 8.4],   // the drag to the line
+  ],
+  bank: [
+    [0.000, 0], [0.090, 6], [0.150, 8], [0.210, 4],
+    [0.290, 10],   // switchback 1 is a left: banked in
+    [0.335, 2],
+    [0.395, -10],  // switchback 2 is a right: banked the other way
+    [0.445, 2], [0.490, 5], [0.545, 4], [0.610, 8],
+    [0.655, 12],   // plunging sweeper carries real bank
+    [0.695, -6],   // right flick, briefly off-camber
+    [0.740, 16], [0.790, 18], [0.835, 8], [0.875, 5],
+    [0.930, 2], [0.975, 0],
+  ],
+  zones: [
+    { t0: 0.000, fade: 0.016, name: 'start',
+      nearL: [0, -0.4, 1.6], farL: 16, farDL: 110, rockL: 0.1, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.4, -1.6, -3.4], farR: -6, farDR: 60, rockR: 0.25, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
+      cobble: 0, kerb: 1 },
+    { t0: 0.140, fade: 0.020, name: 'coast',
+      nearL: [0, 0.4, 4.0], farL: 30, farDL: 110, rockL: 0.45, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
+      nearR: [-0.5, -2.2, -5.0], farR: -6, farDR: 70, rockR: 0.35, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.270, fade: 0.016, name: 'switchbacks',
+      nearL: [0, 1.6, 13], farL: 60, farDL: 90, rockL: 0.9, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -8, -26], farR: -7, farDR: 60, rockR: 0.85, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_NONE, wallOffR: 0,
+      cobble: 0, kerb: 1 },
+    { t0: 0.484, fade: 0.014, name: 'summit',
+      nearL: [0, 2.0, 14], farL: 66, farDL: 90, rockL: 0.95, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [0, 1.0, 8], farR: 60, farDR: 90, rockR: 0.9, shoulderR: 4, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.525, fade: 0.013, name: 'tunnel',
+      nearL: [0, 2.6, 15], farL: 62, farDL: 90, rockL: 1, shoulderL: 3, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: TUNNEL_CLEAR - 0.15,
+      nearR: [0, 1.0, 10], farR: 58, farDR: 90, rockR: 1, shoulderR: 3, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: TUNNEL_CLEAR - 0.15,
+      cobble: 0, kerb: 1 },
+    { t0: 0.588, fade: 0.016, name: 'descent',
+      nearL: [0, 1.4, 12], farL: 54, farDL: 100, rockL: 0.85, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -7, -22], farR: -7, farDR: 55, rockR: 0.8, shoulderR: 2.0, surfR: Surface.Dirt, wallR: WALL_NONE, wallOffR: 0,
+      cobble: 0, kerb: 1 },
+    { t0: 0.719, fade: 0.018, name: 'seafront',
+      nearL: [0, -0.4, 2.5], farL: 26, farDL: 130, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.6,
+      nearR: [-0.8, -3.5, -10], farR: -6, farDR: 80, rockR: 0.2, shoulderR: 10, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
+      cobble: 0, kerb: 1 },
+    { t0: 0.862, fade: 0.012, name: 'harbour',
+      nearL: [0, -0.5, 1.8], farL: 20, farDL: 120, rockL: 0.2, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
+      nearR: [-0.3, -1.4, -3.6], farR: -6, farDR: 90, rockR: 0.25, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.7,
+      cobble: 0, kerb: 1 },
+    { t0: 0.930, fade: 0.008, name: 'return',
+      nearL: [0, -0.4, 1.4], farL: 18, farDL: 120, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.4, -1.8, -4.0], farR: -6, farDR: 80, rockR: 0.25, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.4,
+      cobble: 0, kerb: 1 },
+  ],
+  tunnel: [0.527, 0.582],
+  bridge: null,
+  boostPads: [
+    { t0: 0.5320, t1: 0.5490, lat: -2.9, hw: 1.9 },
+    { t0: 0.5320, t1: 0.5490, lat: 2.9, hw: 1.9 },
+    { t0: 0.6360, t1: 0.6530, lat: 0.0, hw: 2.6 },
+    { t0: 0.9360, t1: 0.9530, lat: -3.0, hw: 2.0 },
+    { t0: 0.9360, t1: 0.9530, lat: 3.0, hw: 2.0 },
+  ],
+  boxRows: [0.055, 0.160, 0.250, 0.345, 0.440, 0.510, 0.615, 0.690, 0.775, 0.885],
+  hoardingZones: [[0, 0.10], [0.70, 0.84]],
+};
+
+// ===========================================================================
 //  Registry + active-track resolution
 // ===========================================================================
-export const TRACKS: TrackDef[] = [SUNSET_BAY, NEON_HORIZON];
+export const TRACKS: TrackDef[] = [SUNSET_BAY, NEON_HORIZON, SUMMIT_SPRINT];
 
 export const TRACK_STORAGE_KEY = 'kr.track';
 

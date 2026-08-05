@@ -19,8 +19,16 @@ export type ScreenName = 'none' | 'title' | 'track' | 'select' | 'pause' | 'resu
 
 /** one-line character blurb per circuit, shown on its select card */
 const TRACK_TAGLINES: Record<string, string> = {
-  'sunset-bay': 'Harbour, village esses, cliff tunnel, banked 180',
-  'neon-horizon': 'Shore straight, ridge climb, high banked carousel',
+  'sunset-bay': '3 laps — harbour, village esses, cliff tunnel, banked 180',
+  'neon-horizon': '3 laps — shore straight, ridge climb, banked carousel',
+  'summit-sprint': 'Sprint — one flying run over the mountain, hairpins and a summit tunnel',
+};
+
+/** card accent per circuit */
+const TRACK_ACCENTS: Record<string, string> = {
+  'sunset-bay': '#ffcf6b',
+  'neon-horizon': '#ff2d95',
+  'summit-sprint': '#4fe8ff',
 };
 
 /**
@@ -541,7 +549,7 @@ export class Menus {
     this.trackCards.length = 0;
     TRACKS.forEach((def, i) => {
       const c = el('div', 'kr-card kr-card-track', roster);
-      c.style.setProperty('--c', i === 0 ? '#ffcf6b' : '#ff2d95');
+      c.style.setProperty('--c', TRACK_ACCENTS[def.id] ?? '#ff2d95');
       const chip = el('div', 'kr-card-chip', c);
       el('div', 'kr-card-init', chip, def.name.charAt(0).toUpperCase());
       if (def.id === TRACK_ID) el('div', 'kr-card-you', c, 'Now');
@@ -735,7 +743,10 @@ export class Menus {
       // and the old in-race tower shipped "BRAMB…" and "MARLO…" in all ten
       // review frames.
       el('div', 'kr-row-n', row, k.stats.name);
-      el('div', 'kr-row-t', row, `Lap ${clamp(k.lap + 1, 1, race.totalLaps)}/${race.totalLaps}`);
+      // On a sprint there is no lap arithmetic worth printing per row.
+      el('div', 'kr-row-t', row,
+        race.totalLaps === 1 ? (k.finished ? 'Finished' : 'On course')
+          : `Lap ${clamp(k.lap + 1, 1, race.totalLaps)}/${race.totalLaps}`);
     });
   }
 
@@ -776,12 +787,12 @@ export class Menus {
     for (let i = 0; i < laps.length; i++) if (best < 0 || laps[i] < laps[best]) best = i;
 
     const callout = el('div', 'kr-best', this.lapsEl);
-    el('b', undefined, callout, 'Best lap');
+    el('b', undefined, callout, this.ctx.race.totalLaps === 1 ? 'Sprint time' : 'Best lap');
     el('em', undefined, callout, best >= 0 ? formatClock(laps[best], 3) : '—:—.———');
 
     for (let i = 0; i < race.totalLaps; i++) {
       const line = el('div', 'kr-lapline' + (i === best ? ' best' : ''), this.lapsEl);
-      el('b', undefined, line, `Lap ${i + 1}`);
+      el('b', undefined, line, race.totalLaps === 1 ? 'Sprint' : `Lap ${i + 1}`);
       el('em', undefined, line, i < laps.length ? formatClock(laps[i], 3) : '—');
     }
     const total = el('div', 'kr-lapline kr-lapline-total', this.lapsEl);

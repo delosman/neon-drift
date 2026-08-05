@@ -201,6 +201,9 @@ export const BOOST_PADS: { t0: number; t1: number; lat: number; hw: number }[] =
 /** Item-box rows around the lap, avoiding the boost strips. */
 export const BOX_ROWS: number[] = ACTIVE_TRACK.boxRows;
 
+/** Race length in laps; 1 = a sprint (see TrackDefs). */
+export const RACE_LAPS: number = ACTIVE_TRACK.laps;
+
 // ---------------------------------------------------------------------------
 // Cyclic Catmull-Rom over keyframes
 // ---------------------------------------------------------------------------
