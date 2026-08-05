@@ -1,7 +1,7 @@
 {
-  "name": "Kart Royale",
-  "short_name": "Kart Royale",
-  "description": "A kart racer with no art assets — every texture, mesh and sound generated in code.",
+  "name": "Neon Drift",
+  "short_name": "Neon Drift",
+  "description": "A synthwave kart racer with no art assets — every texture, mesh and sound generated in code.",
   "start_url": ".",
   "scope": ".",
   "display": "fullscreen",

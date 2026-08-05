@@ -123,13 +123,13 @@ const LOGO_SVG = `
     <text class="kr-logo-wm" font-size="104" letter-spacing="10"
           fill="url(#krCream)" stroke="#181425" stroke-width="17"
           paint-order="stroke" stroke-linejoin="round">
-      <textPath href="#krArc" startOffset="50%" text-anchor="middle">KART</textPath>
+      <textPath href="#krArc" startOffset="50%" text-anchor="middle">NEON</textPath>
     </text>
 
-    <text class="kr-logo-wm" x="450" y="322" font-size="152" letter-spacing="6"
+    <text class="kr-logo-wm" x="450" y="322" font-size="152" letter-spacing="18"
           text-anchor="middle" fill="url(#krGold)" stroke="#181425" stroke-width="19"
           paint-order="stroke" stroke-linejoin="round"
-          transform="skewX(-7) translate(39 0)">ROYALE</text>
+          transform="skewX(-7) translate(39 0)">DRIFT</text>
 
     <path d="M 118 358 Q 450 386 786 344" fill="none" stroke="url(#krSwoosh)"
           stroke-width="11" stroke-linecap="round"/>

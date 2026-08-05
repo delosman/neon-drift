@@ -109,7 +109,7 @@ export interface TrackDef {
 // ===========================================================================
 const SUNSET_BAY: TrackDef = {
   id: 'sunset-bay',
-  name: 'Sunset Bay Circuit',
+  name: 'Vice Bay Circuit',
   dressLabel: 'dressing the bay',
   kit: 'coastal',
   laps: 3,

@@ -19,7 +19,7 @@ First publish (creates the app on VIVERSE and prints its App ID):
 
 ```bash
 npm run build
-viverse-cli app publish dist --auto-create-app --name "Kart Royale"
+viverse-cli app publish dist --auto-create-app --name "Neon Drift"
 ```
 
 Subsequent updates (use the App ID from the first publish):

@@ -798,7 +798,7 @@ export class TexLib {
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.letterSpacing = '6px';
-      g.fillText('NITRO  ·  AMALFI OIL  ·  BOOST CO.  ·  MARINA', size / 2, hh * 0.9);
+      g.fillText('NITRO  ·  LAZERWAX  ·  BOOST CO.  ·  VHS FM', size / 2, hh * 0.9);
       // course name
       g.fillStyle = '#f2ece0';
       g.font = `900 ${hh * 0.42}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
@@ -963,14 +963,14 @@ export class TexLib {
       // contrast, not just hue contrast — hue is the first thing a mip average
       // throws away.
       const boards: [string, string, string][] = [
-        ['#e0453f', '#f9f4ea', 'SUNSET'],
-        ['#2f6ba0', '#f5e2b0', 'TURBO'],
-        ['#f5e2b0', '#8f3f22', 'AMALFI'],
-        ['#2f5d43', '#f2ece0', 'MARINA'],
-        ['#ff9d2e', '#2b2b34', 'NITRO'],
-        ['#2b2f3a', '#4fc3ff', 'ROYALE'],
-        ['#c78ec2', '#2b2430', 'GOLD'],
-        ['#4fc3ff', '#20303c', 'BOOST'],
+        ['#ff2d95', '#f0f6ff', 'VICE'],
+        ['#2f6bc0', '#c9b8f0', 'TURBO'],
+        ['#c9b8f0', '#5a1f7a', 'VAPOR'],
+        ['#2f8a74', '#e6f8ff', 'PALMS'],
+        ['#ff6ee0', '#2b2434', 'NITRO'],
+        ['#2b2f3a', '#4fe8ff', 'DRIFT'],
+        ['#c78ec2', '#2b2430', 'CHROME'],
+        ['#4fe8ff', '#20303c', 'BOOST'],
       ];
       for (let i = 0; i < 8; i++) {
         const cx = (i % 2) * w,

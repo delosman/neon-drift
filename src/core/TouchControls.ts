@@ -1498,7 +1498,7 @@ const MARKUP = `
 
 <div class="tc-coach"></div>
 
-<div class="tc-rotate"><div><b>Rotate your device</b><br/>Kart Royale plays in landscape.</div></div>
+<div class="tc-rotate"><div><b>Rotate your device</b><br/>Neon Drift plays in landscape.</div></div>
 `;
 
 const CSS = `

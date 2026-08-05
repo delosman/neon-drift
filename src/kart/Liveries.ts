@@ -1707,7 +1707,7 @@ export interface Livery {
 }
 
 const NUMBERS = [5, 11, 27, 3, 44, 8, 17, 62];
-const SPONSORS = ['AZZURA', 'KOMOTO', 'SUNBOLT', 'MARINA 9', 'VELOCE', 'PIRO CO', 'DELTAWING', 'ORBITA'];
+const SPONSORS = ['VOLTA', 'NEON 84', 'LZRWAX', 'MIDNITE', 'VECTOR', 'GRID CO', 'DELTAWAVE', 'ORBITA'];
 const SKINS = [0xf0c39a, 0x8d5a3b, 0xe7b183, 0xc98b5e, 0xf3d0b0, 0x6f4429, 0xd79c72, 0xa86f47];
 
 const _hsl = { h: 0, s: 0, l: 0 };

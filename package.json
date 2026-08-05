@@ -1,7 +1,7 @@
 {
-  "name": "kart-game",
+  "name": "neon-drift",
   "version": "1.0.0",
-  "description": "",
+  "description": "Neon Drift — a synthwave kart racer, forked from Kart Royale.",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
