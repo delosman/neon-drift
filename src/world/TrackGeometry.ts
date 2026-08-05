@@ -24,7 +24,7 @@ import { Surface } from '../types';
 import type { Track } from './Track';
 import {
   BOOST_PADS, BRIDGE_T0, BRIDGE_T1, FASCIA_OFF, GRID_BOX_HL, GRID_BOX_HW,
-  GRID_LAT, KERB_HS, KERB_QS, KERB_W, PARAPET_OFF, SEA_Y,
+  GRID_LAT, HAS_BRIDGE, HAS_TUNNEL, KERB_HS, KERB_QS, KERB_W, PARAPET_OFF, SEA_Y,
   SKIRT_W, TUNNEL_CLEAR, TUNNEL_H, TUNNEL_T0, TUNNEL_T1, WALL_GUARDRAIL,
   WALL_PARAPET, WALL_ROCK,
   Z_BEACH, Z_TUNNEL, gridSlot, smoothstep as ss, type Corner,
@@ -36,17 +36,21 @@ import { registerPrewarm } from '../core/Prewarm';
 // ---------------------------------------------------------------------------
 //  Palette (art bible §3). THREE.Color is linear working space here.
 // ---------------------------------------------------------------------------
-const C_TARMAC = new THREE.Color('#4a4a52');
-const C_RACE = new THREE.Color('#3e3e48');
-const C_KERB_R = new THREE.Color('#e0453f');
-const C_KERB_W = new THREE.Color('#f2ece0');
-const C_SAND = new THREE.Color('#e3c893');
-const C_GRASS = new THREE.Color('#6f9b47');
-const C_GRASS_T = new THREE.Color('#87b356');
-const C_DIRT = new THREE.Color('#9c7a52');
-const C_STONE = new THREE.Color('#a8927a');
-const C_GRIME = new THREE.Color('#6a6154');
-const C_PAINT = new THREE.Color('#f2ece0');
+// Synthwave restyle of the bible's coastal table: blue-violet asphalt, hot
+// magenta kerbs against ice-cyan, teal turf, mauve dirt. Keep the VALUE of
+// each entry close to the colour it replaces — every wear multiplier below
+// was tuned against those luminances and rides on top of these.
+const C_TARMAC = new THREE.Color('#42425e');
+const C_RACE = new THREE.Color('#373752');
+const C_KERB_R = new THREE.Color('#ff2d95');
+const C_KERB_W = new THREE.Color('#e6f8ff');
+const C_SAND = new THREE.Color('#d9b9de');
+const C_GRASS = new THREE.Color('#2f9c85');
+const C_GRASS_T = new THREE.Color('#3fbda0');
+const C_DIRT = new THREE.Color('#7d6394');
+const C_STONE = new THREE.Color('#8f86b0');
+const C_GRIME = new THREE.Color('#565170');
+const C_PAINT = new THREE.Color('#e6f8ff');
 
 /**
  * Vertex-colour multiplier that carries tarmac `#4a4a52` to the racing-line
@@ -64,10 +68,10 @@ const C_PAINT = new THREE.Color('#f2ece0');
  * of this, and the two must not stack into a black stripe.
  */
 const C_RACE_MUL = new THREE.Color(0.75, 0.75, 0.90);
-/** warm dusting where the beach blows sand across the outer lane */
-const C_SAND_MUL = new THREE.Color(1.30, 1.16, 0.92);
+/** violet dusting where the beach blows sand across the outer lane */
+const C_SAND_MUL = new THREE.Color(1.22, 1.08, 1.24);
 /** pale silt and grit washed into the gutter, in patches, everywhere */
-const C_DUST_MUL = new THREE.Color(1.24, 1.14, 0.97);
+const C_DUST_MUL = new THREE.Color(1.16, 1.12, 1.20);
 /**
  * Sun-bleached outer lane. Warm and slightly *up* in value: an outer lane that
  * no wheel polishes keeps its lighter, oxidised binder, and it is the second
@@ -75,7 +79,7 @@ const C_DUST_MUL = new THREE.Color(1.24, 1.14, 0.97);
  * product with the map cannot clip — `#4a4a52` is only 0.075 linear, so there is
  * plenty of headroom, but the gutter dust can land on the same vertex.
  */
-const C_BLEACH_MUL = new THREE.Color(1.34, 1.29, 1.18);
+const C_BLEACH_MUL = new THREE.Color(1.30, 1.24, 1.32);
 /** the dark kiss of rubber and dirt packed into the kerb/tarmac joint */
 const C_JOINT_MUL = new THREE.Color(0.42, 0.40, 0.42);
 
@@ -1041,8 +1045,8 @@ export function buildTrackGeometry(track: Track, ctx: Ctx) {
   buildTerrain(track, lib, g);
   buildSea(track, lib, g);
   buildBarriers(track, lib, g);
-  buildTunnel(track, lib, g);
-  buildBridge(track, lib, g);
+  if (HAS_TUNNEL) buildTunnel(track, lib, g);
+  if (HAS_BRIDGE) buildBridge(track, lib, g);
   // anything we cloned out of the shared library is invisible to its own
   // update(), so Track has to hand those copies the env map itself
   track.registerEnvClones(lib.clones);

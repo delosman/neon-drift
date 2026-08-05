@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- *  SUNSET BAY CIRCUIT — layout authoring
+ *  TRACK LAYOUT — bakes the active circuit definition into the station table
  * ============================================================================
  *  The centreline is authored as a *curvature schedule* rather than a list of
  *  points: a table of legs, each with a length and a heading change. Curvature
@@ -20,15 +20,23 @@
  * ============================================================================
  */
 import * as THREE from 'three';
-import { Surface } from '../types';
 import { createNoise2D } from 'simplex-noise';
+import { ACTIVE_TRACK, KERB_W } from './TrackDefs';
+
+// The per-circuit data (legs, keyframe channels, zones, boost pads, spans)
+// lives in TrackDefs.ts; this module bakes whichever definition is active.
+// Physical constants shared across circuits are re-exported so the geometry
+// builder keeps a single import site.
+export {
+  KERB_W, TUNNEL_CLEAR, TUNNEL_H, PARAPET_OFF, PARAPET_FACE, FASCIA_OFF,
+  WALL_NONE, WALL_GUARDRAIL, WALL_ROCK, WALL_PARAPET, WALL_HEIGHT,
+  TRACK_ID, TRACK_NAME, TRACKS, TRACK_STORAGE_KEY, ACTIVE_TRACK,
+} from './TrackDefs';
 
 // --- world constants shared with the geometry builder ---------------------
 export const SEA_Y = 0;
 /** drainage crown: the road crest sits this much above its edge */
 export const CROWN = 0.09;
-/** lateral width of the kerb band, sitting OUTSIDE `halfWidth` */
-export const KERB_W = 1.6;
 
 /**
  * Kerb cross-section, as lateral metres past the road edge (`KERB_QS`) and the
@@ -91,32 +99,27 @@ export const CHECKPOINTS = 32;
 /** station spacing of the baked centreline, metres */
 export const STATION_DS = 0.5;
 
-// wall kinds
-export const WALL_NONE = 0;
-export const WALL_GUARDRAIL = 1;
-export const WALL_ROCK = 2;
-export const WALL_PARAPET = 3;
-export const WALL_HEIGHT = [0, 0.92, 4.5, 1.15];
-
-// zone ids (finer than the eight art sections: the bridge span and its
-// approach need their own terrain profiles)
-export const Z_START = 0;
-export const Z_HARBOUR = 1;
-export const Z_VILLAGE = 2;
-export const Z_CLIFF = 3;
-export const Z_TUNNEL = 4;
-export const Z_BEACH = 5;
-export const Z_BANKED = 6;
-export const Z_APPROACH = 7;
-export const Z_BRIDGE = 8;
-export const Z_RETURN = 9;
+/**
+ * Zone ids are indices into the active def's `zones` table, resolved by name
+ * so a circuit that lacks a section simply never matches. 255 is "not on this
+ * circuit" — `cl.zone` is a Uint8Array, so no baked station can ever equal it
+ * on a track with a sane zone count.
+ */
+const zoneId = (name: string): number => {
+  const i = ACTIVE_TRACK.zones.findIndex((z) => z.name === name);
+  return i >= 0 ? i : 255;
+};
+export const Z_TUNNEL = zoneId('tunnel');
+export const Z_BEACH = zoneId('beach');
 
 /** Tunnel span, exported so the geometry builder and fog logic agree. */
-export const TUNNEL_T0 = 0.521;
-export const TUNNEL_T1 = 0.599;
+export const HAS_TUNNEL = ACTIVE_TRACK.tunnel !== null;
+export const TUNNEL_T0 = ACTIVE_TRACK.tunnel?.[0] ?? -1;
+export const TUNNEL_T1 = ACTIVE_TRACK.tunnel?.[1] ?? -1;
 /** Bridge span. */
-export const BRIDGE_T0 = 0.893;
-export const BRIDGE_T1 = 0.950;
+export const HAS_BRIDGE = ACTIVE_TRACK.bridge !== null;
+export const BRIDGE_T0 = ACTIVE_TRACK.bridge?.[0] ?? -1;
+export const BRIDGE_T1 = ACTIVE_TRACK.bridge?.[1] ?? -1;
 
 // ---------------------------------------------------------------------------
 //  Structure clearances, measured OUTWARD FROM THE ROAD EDGE (`halfWidth`).
@@ -129,16 +132,8 @@ export const BRIDGE_T1 = 0.950;
 //  live here so the wall table below, the collision offsets and the meshes are
 //  all derived from one number apiece.
 // ---------------------------------------------------------------------------
-/** Half-width the tunnel bore springs from: road edge + kerb + a reveal. */
-export const TUNNEL_CLEAR = KERB_W + 0.8;
-/** Crown height of the bore above the road plane. */
-export const TUNNEL_H = 7.6;
-/** Outer plane of the bridge parapet; its coping chamfers 0.62 m back inboard. */
-export const PARAPET_OFF = KERB_W + 0.70;
-/** Inboard face of that parapet — what a kart actually hits. */
-export const PARAPET_FACE = PARAPET_OFF - 0.62;
-/** Deck fascia / spandrel wall, just outboard of the parapet. */
-export const FASCIA_OFF = PARAPET_OFF + 0.12;
+// TUNNEL_CLEAR / TUNNEL_H / PARAPET_OFF / PARAPET_FACE / FASCIA_OFF moved to
+// TrackDefs.ts (the zone tables reference them) and are re-exported above.
 
 // ---------------------------------------------------------------------------
 //  The standing grid.
@@ -176,27 +171,11 @@ export function gridSlot(k: number): { back: number; lat: number } {
 
 // ---------------------------------------------------------------------------
 // The leg table.  [length metres, heading change degrees]  (negative = left)
+// Authored per circuit in TrackDefs.ts; baked from whichever def is active.
 // ---------------------------------------------------------------------------
-const LEGS: [number, number][] = [
-  [160, -13.85],  // 0.000 start straight — harbour boulevard
-  [192, -102.06], // 0.100 harbour sweep
-  [70, -44.48],   // 0.220 village ess A (left)
-  [60, 40.84],    // 0.264 village ess B (right)
-  [66, -44.12],   // 0.301 village ess C (left, off-camber)
-  [60, -20.79],   // 0.343 village ess D (left)
-  [90, -21.02],   // 0.380 cliff traverse A
-  [74, -4.13],    // 0.436 cliff traverse B
-  [60, -17.70],   // 0.482 cliff traverse C
-  [128, -21.13],  // 0.520 tunnel
-  [110, -2.81],   // 0.600 beach descent A
-  [114, -21.15],  // 0.669 beach descent B
-  [192, -170.85], // 0.740 banked coastal 180
-  [60, 42.32],    // 0.860 bridge approach
-  [84, 11.22],    // 0.897 bridge span
-  [80, 24.47],    // 0.950 return to the line
-];
-const PLAN_LENGTH = 1600;
-const START_HEADING = 45 * THREE.MathUtils.DEG2RAD;
+const LEGS: [number, number][] = ACTIVE_TRACK.legs;
+const PLAN_LENGTH = LEGS.reduce((s, [len]) => s + len, 0);
+const START_HEADING = ACTIVE_TRACK.startHeading * THREE.MathUtils.DEG2RAD;
 
 // ---------------------------------------------------------------------------
 // Keyframed channels.  All cyclic Catmull-Rom in t so the seam at the start
@@ -205,199 +184,22 @@ const START_HEADING = 45 * THREE.MathUtils.DEG2RAD;
 // ---------------------------------------------------------------------------
 type Keys = [number, number][];
 
-const ELEVATION: Keys = [
-  [0.000, 3.0], [0.100, 3.6], [0.220, 7.0], [0.300, 15.0],
-  [0.380, 29.0], [0.440, 41.5], [0.500, 38.0], [0.560, 33.0],
-  [0.600, 28.0], [0.660, 16.0], [0.720, 5.5], [0.800, 14.0],
-  // the run off the bridge flattens out well before the line so the standing
-  // grid is level rather than stacked down a 14% slope
-  [0.860, 24.0], [0.900, 19.5], [0.935, 14.5], [0.962, 9.0],
-  [0.982, 4.6], [0.995, 3.15],
-];
+const ELEVATION: Keys = ACTIVE_TRACK.elevation;
+const HALF_WIDTH: Keys = ACTIVE_TRACK.halfWidth;
+const BANK: Keys = ACTIVE_TRACK.bank;
 
-/**
- * Road half-width, metres.
- *
- * ===========================================================================
- *  THE SINGLE MOST IMPORTANT TABLE IN THE FILE. Read the reasoning before
- *  touching a number in it.
- * ===========================================================================
- *
- * Rounds 1–3 ran 13 m half-width — a 26 m road. A kart is 1.7 m across the
- * tyres, so that is *fifteen karts abreast*. The consequences were visible in
- * every frame shipped and were reported by the composition critic three times:
- *
- *   • a third to a half of the image was empty featureless asphalt,
- *   • the player's kart was a speck and the hero asset could not be read,
- *   • an eight-kart field spread across 26 m never bunches, so nothing about
- *     the frame said "race",
- *   • and everything Scenery places is anchored at `halfWidth + offset`, so a
- *     26 m road physically pushed the entire world 13 m further out on each
- *     side and left the road bounded by void.
- *
- * The fix is not a tweak. A Mario Kart road is four to five karts wide — wide
- * enough for a pack of four abreast plus a passing line, and no wider. That is
- * 7–8 m of half-width, going to ~9 only where the layout genuinely needs room
- * (the standing start, and the 20° banked 180 where the whole field takes a
- * different line), and down to 5.4 on the cliff ledge where narrow *is* the
- * drama.
- *
- * Every consumer of this number scales off it rather than duplicating it —
- * `race` (the ideal line), `planRoadLats`, the kerb corridor, the skirt, the
- * barrier offsets, the tunnel bore, the bridge parapets, the AI's lateral
- * targets, item-box rows, and roughly sixty scenery anchors. So this table
- * moves the world, which is the entire point of it living here.
- *
- * Interpolated with `cyclicMonotone`, not `cyclic`: see the note there. An
- * overshooting spline on this channel is a width bulge or pinch that no
- * keyframe asked for, and at these amplitudes it is visible.
- */
-const HALF_WIDTH: Keys = [
-  [0.000, 8.8],   // start straight — the pack launches eight-up, needs the room
-  [0.070, 8.6],
-  [0.140, 8.1],   // harbour sweep, tightening
-  [0.210, 7.5],
-  [0.270, 7.0],   // village: terraced houses press in on both sides
-  [0.330, 6.8],
-  [0.380, 6.4],   // cliff traverse begins
-  [0.440, 5.7],
-  [0.480, 5.4],   // narrowest point of the circuit — 10.8 m of ledge
-  [0.521, 5.9],   // tunnel mouth opens back out a little
-  [0.560, 6.3],
-  [0.620, 6.9],   // beach descent, fast, opening
-  [0.700, 7.6],
-  [0.760, 8.8],   // banked coastal 180 — the money shot, and a real passing lane
-  [0.830, 8.7],
-  [0.880, 7.2],   // bridge approach pinches
-  [0.930, 7.0],   // bridge deck, between the parapets
-  [0.968, 8.2],   // back onto the harbour front
-];
+// Per-zone terrain + furniture: authored per circuit in TrackDefs.ts.
+// The ZoneDef shape (and the reasoning behind the wall offsets) lives there.
+import type { ZoneDef } from './TrackDefs';
+export type { ZoneDef };
+export const ZONES: ZoneDef[] = ACTIVE_TRACK.zones;
 
-/** degrees; positive = right side raised (types.ts convention) */
-const BANK: Keys = [
-  [0.000, 0], [0.070, 0], [0.130, 7], [0.170, 9.5], [0.210, 5],
-  [0.240, 4], [0.265, 5],
-  [0.283, -6],   // village ess B is a right-hander: bank the correct way
-  [0.312, -4],   // ...and ess C is a LEFT-hander held at negative bank:
-  [0.330, -4],   //    genuinely off-camber, exactly as the bible asks
-  [0.348, 0], [0.366, 4], [0.400, 3], [0.440, 2], [0.482, 3],
-  [0.520, 4], [0.560, 5], [0.600, 3], [0.660, 2], [0.700, 6],
-  [0.735, 12], [0.775, 20], [0.820, 20], [0.848, 12], [0.870, 2],
-  [0.893, -5], [0.925, -3], [0.958, -6], [0.985, -2],
-];
+/** Boost strips, authored per circuit against its own widths. */
+export const BOOST_PADS: { t0: number; t1: number; lat: number; hw: number }[] =
+  ACTIVE_TRACK.boostPads;
 
-// ---------------------------------------------------------------------------
-// Per-zone terrain + furniture description.
-//   near[]  : vertical offset from the shoulder edge at q = 0 / 3 / 12 metres
-//   far     : absolute world height the land settles at, far from the road
-//   farD    : distance over which it gets there
-//   rock    : 0..1 rockiness, drives triplanar rock blending in the material
-// ---------------------------------------------------------------------------
-interface ZoneDef {
-  t0: number;
-  fade: number;
-  name: string;
-  nearL: [number, number, number];
-  farL: number;
-  farDL: number;
-  rockL: number;
-  shoulderL: number;
-  surfL: Surface;
-  wallL: number;
-  wallOffL: number;
-  nearR: [number, number, number];
-  farR: number;
-  farDR: number;
-  rockR: number;
-  shoulderR: number;
-  surfR: Surface;
-  wallR: number;
-  wallOffR: number;
-  /** 0 = tarmac, 1 = cobblestone */
-  cobble: number;
-  /** kerbs suppressed on the bridge deck */
-  kerb: number;
-}
-
-/**
- * Wall offsets are metres OUTBOARD OF THE ROAD EDGE, and they moved with the
- * width cut. They used to sit at 4.0–4.5 m, i.e. 2.4–2.9 m of bare shoulder
- * between the outside of the kerb and the barrier. On a 26 m road that gap was
- * 9% of the corridor and invisible; on a 15 m road it is a fifth of it, and a
- * barrier standing that far back from a narrow road reads as fencing round a
- * field rather than as the edge of a circuit.
- *
- * 2.7–3.6 m puts the Armco 1.1–2.0 m outboard of the kerb: close enough to
- * frame the road and give the low sun something to cast along, far enough that
- * a kart that has run wide onto the shoulder still gets a moment to gather it
- * up before the barrier collects them.
- */
-export const ZONES: ZoneDef[] = [
-  { t0: 0.000, fade: 0.016, name: 'start',
-    nearL: [0, -0.4, 1.6], farL: 16, farDL: 110, rockL: 0.1, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
-    nearR: [-0.4, -1.6, -3.4], farR: -6, farDR: 60, rockR: 0.25, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
-    cobble: 0, kerb: 1 },
-  { t0: 0.100, fade: 0.016, name: 'harbour',
-    nearL: [0, -0.4, 2.0], farL: 22, farDL: 130, rockL: 0.12, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
-    nearR: [-0.4, -1.8, -3.6], farR: -6, farDR: 50, rockR: 0.3, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
-    cobble: 0, kerb: 1 },
-  { t0: 0.220, fade: 0.020, name: 'village',
-    nearL: [0, -0.5, 2.6], farL: 34, farDL: 120, rockL: 0.2, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
-    nearR: [-0.3, -1.4, -4.0], farR: -6, farDR: 130, rockR: 0.3, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.7,
-    cobble: 1, kerb: 1 },
-  { t0: 0.380, fade: 0.014, name: 'cliff',
-    nearL: [0, 1.6, 14], farL: 64, farDL: 100, rockL: 0.95, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-    nearR: [-1.4, -9, -32], farR: -7, farDR: 38, rockR: 0.95, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_NONE, wallOffR: 0,
-    cobble: 0, kerb: 1 },
-  { t0: 0.521, fade: 0.013, name: 'tunnel',
-    // 0.15 m inboard of the bore wall, so the collision catches a kart before
-    // the camera can see it kiss the rock rather than 1.4 m early as before
-    nearL: [0, 2.6, 15], farL: 54, farDL: 90, rockL: 1, shoulderL: 3, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: TUNNEL_CLEAR - 0.15,
-    nearR: [0, 1.0, 10], farR: 40, farDR: 90, rockR: 1, shoulderR: 3, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: TUNNEL_CLEAR - 0.15,
-    cobble: 0, kerb: 1 },
-  { t0: 0.600, fade: 0.024, name: 'beach',
-    nearL: [0, -0.5, 1.5], farL: 26, farDL: 130, rockL: 0.35, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_NONE, wallOffL: 0,
-    nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 90, rockR: 0.05, shoulderR: 12, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
-    cobble: 0, kerb: 1 },
-  { t0: 0.740, fade: 0.016, name: 'banked',
-    nearL: [0, -0.4, 2.5], farL: 34, farDL: 140, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.6,
-    nearR: [-1.0, -4.5, -15], farR: -7, farDR: 46, rockR: 0.55, shoulderR: 10, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
-    cobble: 0, kerb: 1 },
-  { t0: 0.860, fade: 0.012, name: 'approach',
-    nearL: [0, -0.5, 1.0], farL: 22, farDL: 120, rockL: 0.3, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_NONE, wallOffL: 0,
-    nearR: [-0.5, -2.0, -6], farR: -7, farDR: 90, rockR: 0.45, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_NONE, wallOffR: 0,
-    cobble: 0, kerb: 1 },
-  { t0: 0.893, fade: 0.006, name: 'bridge',
-    // PARAPET_FACE, not a hand-typed 1.7: the old number put the collision
-    // plane 0.4 m OUTBOARD of the stone the kart can see, so on a narrow deck
-    // karts visibly buried a corner in the parapet before anything stopped them
-    nearL: [-1.5, -9, -20], farL: -6, farDL: 46, rockL: 0.8, shoulderL: 0.6, surfL: Surface.Dirt, wallL: WALL_PARAPET, wallOffL: PARAPET_FACE,
-    nearR: [-1.5, -9, -20], farR: -6, farDR: 46, rockR: 0.8, shoulderR: 0.6, surfR: Surface.Dirt, wallR: WALL_PARAPET, wallOffR: PARAPET_FACE,
-    cobble: 0.55, kerb: 0 },
-  { t0: 0.950, fade: 0.008, name: 'return',
-    nearL: [0, -0.4, 1.4], farL: 18, farDL: 120, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
-    nearR: [-0.4, -1.8, -4.0], farR: -6, farDR: 80, rockR: 0.25, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.4,
-    cobble: 0, kerb: 1 },
-];
-
-/**
- * Boost strips: tunnel pair, tunnel centre, and the run out of the bridge.
- *
- * Every one of these was authored against a 26 m road. The tunnel pair sat at
- * ±4.6 with a 2.9 m half-width, so its outer edge was 7.5 m from the centreline
- * — a metre *past* the road edge on the 6.1 m half-width the tunnel now runs.
- * A boost pad hanging over the kerb is both a rendering fault and a gameplay
- * one, because `probe()` reports `Surface.Boost` out there whatever the mesh is
- * doing. Retuned so every strip stays inside `halfWidth − 1.0` at its narrowest
- * station, which is the edge line.
- */
-export const BOOST_PADS: { t0: number; t1: number; lat: number; hw: number }[] = [
-  { t0: 0.5380, t1: 0.5555, lat: -2.9, hw: 1.9 },
-  { t0: 0.5380, t1: 0.5555, lat: 2.9, hw: 1.9 },
-  { t0: 0.5720, t1: 0.5895, lat: 0.0, hw: 2.6 },
-  { t0: 0.9575, t1: 0.9740, lat: -3.1, hw: 2.2 },
-  { t0: 0.9575, t1: 0.9740, lat: 3.1, hw: 2.2 },
-];
+/** Item-box rows around the lap, avoiding the boost strips. */
+export const BOX_ROWS: number[] = ACTIVE_TRACK.boxRows;
 
 // ---------------------------------------------------------------------------
 // Cyclic Catmull-Rom over keyframes

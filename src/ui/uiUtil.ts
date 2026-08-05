@@ -5,7 +5,7 @@
  * force a style recalc on each one even when the value has not moved.
  */
 
-export const TIER_COLORS = ['#a8b6cc', '#4fc3ff', '#ff9d2e', '#c05cff'];
+export const TIER_COLORS = ['#a8b6cc', '#4fe8ff', '#ff3fa8', '#b44fff'];
 
 export function clamp(v: number, lo: number, hi: number) {
   return v < lo ? lo : v > hi ? hi : v;

@@ -344,12 +344,12 @@ varying vec3 vShore;
 #include <fog_pars_fragment>
 ${WAVES}
 
-// ART_DIRECTION §2/§3, in linear space.
-const vec3 ZENITH  = vec3(0.0508, 0.1746, 0.5457);   // #3f74c4
-const vec3 HORIZON = vec3(1.0000, 0.6308, 0.3515);   // #ffd0a0
-const vec3 SHALLOW = vec3(0.0508, 0.5841, 0.5457);   // #3fc9c4
-const vec3 DEEP    = vec3(0.0040, 0.1022, 0.1946);   // #0d5a7a
-const vec3 FOAM    = vec3(0.8549, 0.9559, 1.0000);   // #eefaff
+// Synthwave palette (matches Atmosphere targets + PAL), in linear space.
+const vec3 ZENITH  = vec3(0.0648, 0.0395, 0.5395);   // #4838c2
+const vec3 HORIZON = vec3(1.0000, 0.2747, 0.6308);   // #ff8fd0
+const vec3 SHALLOW = vec3(0.0160, 0.7454, 0.6038);   // #22e0cc
+const vec3 DEEP    = vec3(0.0080, 0.0103, 0.1559);   // #161a6e
+const vec3 FOAM    = vec3(0.8228, 0.9734, 1.0000);   // #eafcff
 
 // The horizon is NOT one colour. At 14° of sun elevation it runs from a hot
 // #ffd0a0 down-sun to a dusky blue counter-glow behind you, and that spread is
@@ -362,7 +362,7 @@ const vec3 FOAM    = vec3(0.8549, 0.9559, 1.0000);   // #eefaff
 // roughly a third of the sun-ward one and it is unmistakably BLUE; at a third
 // of the luminance and twice the saturation it stops being concrete and starts
 // being the deep end of a bay.
-const vec3 HZ_ANTI = vec3(0.1350, 0.1690, 0.2980);   // counter-glow, dusk blue
+const vec3 HZ_ANTI = vec3(0.1520, 0.1180, 0.3400);   // counter-glow, dusk violet
 
 /** Peak Fresnel. See the file header, fault (1). */
 const float FRES_MAX = 0.60;

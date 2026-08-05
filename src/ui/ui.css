@@ -92,17 +92,17 @@
      over a coastal sunset" complaint, stated as a number. Every ink below is
      now on the warm side of neutral (hue 20–28°), keyed off §3's stone
      `#a8927a` and sand `#e3c893` taken down into shadow. Still never #000. */
-  --ink-2: #17100b;
-  --ink-warm: #1a1208;          /* §3: countdown casing, never #000 */
-  --ink-c: rgba(28, 15, 7, 0.93);  /* the ONE contour ink, for the type ring */
-  --paper: #fff4e2;
-  --dim: rgba(240, 220, 190, 0.66);
-  --gold: #ffcf6b;
+  --ink-2: #120b1e;
+  --ink-warm: #160c22;          /* countdown casing, never #000 */
+  --ink-c: rgba(22, 12, 34, 0.93);  /* the ONE contour ink, for the type ring */
+  --paper: #f4f2ff;
+  --dim: rgba(224, 214, 246, 0.66);
+  --gold: #ff8ae0;
   /* §3 palette, the only hues the HUD is allowed to key an accent from */
-  --sky-warm: #ffd0a0;
-  --kerb-red: #e0453f;
-  --boost-blue: #4fc3ff;
-  --sea-shallow: #3fc9c4;
+  --sky-warm: #ff9de0;
+  --kerb-red: #ff2d95;
+  --boost-blue: #4fe8ff;
+  --sea-shallow: #2fe8d8;
   /* Mini-turbo tier tint. The HUD overwrites this per frame from TIER_COLORS. */
   --tier: #a8b6cc;
   /* Per-widget accent. Overridden by each plate; never used for anything but
@@ -138,24 +138,24 @@
      ramp runs hue 22–27° — the same hue family the tarmac, the cliffs and the
      kerb stone measure at in every captured frame. Opaque, four stops,
      top-lit per §2, and the darkest stop is #170e0a, not black. */
-  --plate-bg: linear-gradient(179deg, #54402f 0%, #3d2b1e 30%, #281a12 66%, #170e0a 100%);
+  --plate-bg: linear-gradient(179deg, #453764 0%, #322347 30%, #201430 66%, #120b1e 100%);
   /* THE rim. Painted as the plate element's own background with the body
      inset over it, so it is a true 1.5 px edge that is WARM along the top
      (accent-tinted rim light, §2's key) and dark along the bottom (the
      die-cut contour that separates the plate from a bright sky). */
   --plate-rim: linear-gradient(
       177deg,
-      color-mix(in srgb, var(--accent) 72%, #fff6e6) 0%,
-      color-mix(in srgb, var(--accent) 34%, rgba(255, 226, 186, 0.34)) 16%,
-      rgba(150, 112, 74, 0.40) 46%,
-      rgba(24, 12, 5, 0.88) 100%);
+      color-mix(in srgb, var(--accent) 72%, #f4ecff) 0%,
+      color-mix(in srgb, var(--accent) 34%, rgba(220, 200, 255, 0.34)) 16%,
+      rgba(118, 96, 168, 0.40) 46%,
+      rgba(14, 8, 26, 0.88) 100%);
   /* One shadow recipe. `filter` rather than `box-shadow` because the plates
      are chamfered and a box-shadow would be squared off by the clip. The
      cast shadow is warm-black too: a cool shadow under a warm plate on warm
      tarmac was the second thing reading as "pasted on". */
   --plate-shadow:
-    drop-shadow(0 0.16vmin 0.28vmin rgba(20, 10, 4, 0.58))
-    drop-shadow(0 1.0vmin 2.0vmin rgba(24, 12, 5, 0.48));
+    drop-shadow(0 0.16vmin 0.28vmin rgba(10, 6, 20, 0.58))
+    drop-shadow(0 1.0vmin 2.0vmin rgba(12, 7, 26, 0.48));
 
   /* --- ONE type scale, ratio ~1.42 -------------------------------------- */
   --t1: clamp(9px, 1.28vmin, 16px);    /* labels, units */
@@ -166,7 +166,7 @@
   --t6: clamp(44px, 6.7vmin, 86px);    /* position */
 
   /* Reserved for the countdown and the menus: the one display gradient. */
-  --gold-ramp: linear-gradient(180deg, #fffdf6 5%, #ffe7ae 45%, #f7ae3c 84%, #e07c14 100%);
+  --gold-ramp: linear-gradient(180deg, #fdfbff 5%, #ffc2ee 45%, #ff4fc0 84%, #a43df0 100%);
   --gold-glow: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
 
   /* --- TYPE -------------------------------------------------------------
@@ -1846,8 +1846,18 @@ html[data-touch][data-touch-hand="left"] .kr .kr-pos {
   font-weight: 900;
   letter-spacing: 0.2em;
   color: var(--ink-2);
-  background: linear-gradient(180deg, #fff2c4, #ffc247);
+  background: linear-gradient(180deg, #ffe0f6, #ff7ad4);
 }
+
+/* track-select cards: two wide cards, one line of circuit character each */
+.kr-card-tag {
+  margin-top: 0.7vmin;
+  font-size: clamp(10px, 1.4vmin, 17px);
+  letter-spacing: 0.06em;
+  color: rgba(255, 252, 244, 0.62);
+  line-height: 1.35;
+}
+.kr-s-track .kr-roster { grid-template-columns: repeat(2, minmax(0, 30vmin)); justify-content: center; }
 
 .kr-stats { margin-top: 1vmin; display: flex; flex-direction: column; gap: 0.55vmin; }
 .kr-stat { display: grid; grid-template-columns: 4.6em 1fr; align-items: center; gap: 0.6em; }

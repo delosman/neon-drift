@@ -54,8 +54,8 @@ const STAR_TIME = 7.4;
 const BOLT_TIME = 6.5;
 const BOLT_STUN = 0.65;
 
-/** rows of boxes around the lap, avoiding the boost strips */
-const BOX_ROWS = [0.052, 0.148, 0.246, 0.336, 0.428, 0.505, 0.646, 0.712, 0.802, 0.906];
+/** rows of boxes around the lap, authored per circuit next to its boost strips */
+import { BOX_ROWS } from '../world/TrackLayout';
 
 /**
  * A row of boxes is a *wall*, not a decoration: it must span the road, and

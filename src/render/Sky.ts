@@ -86,7 +86,7 @@ import {
   buildSkyFragmentShader,
   hazeGlsl,
 } from './Atmosphere';
-import { TUNNEL_T0, TUNNEL_T1 } from '../world/TrackLayout';
+import { HAS_TUNNEL, TUNNEL_T0, TUNNEL_T1 } from '../world/TrackLayout';
 
 // --- tuning ------------------------------------------------------------------
 
@@ -455,7 +455,9 @@ const LATERAL_BOUNCE_SLOPE = -0.14;
  * sRGB 9, and the near-black fraction is unchanged from round 2.
  */
 const FLOOR_IRRADIANCE = 0.185;
-const FLOOR_COLOR = 0x6f9cb4;
+// Synthwave: the colour of every unlit pixel goes violet, matching the indigo
+// zenith the calibration now targets.
+const FLOOR_COLOR = 0x8272c8;
 /**
  * The same floor inside an interior volume, warm sodium instead of teal. The
  * tunnel's premise is sodium strips; rock that falls off the bottom of the
@@ -470,7 +472,9 @@ const FLOOR_COLOR = 0x6f9cb4;
  * tunnel against its own mouth again.
  */
 const INTERIOR_FLOOR_IRRADIANCE = 0.70;
-const INTERIOR_FLOOR_COLOR = 0xc07a3c;
+// The tunnel premise moves from sodium strips to neon: unlit bore rock reads
+// magenta-warm instead of amber.
+const INTERIOR_FLOOR_COLOR = 0xb64a92;
 /**
  * Warm penumbra band, art bible §2 ("long, soft, warm-tinted penumbra").
  * Added where the shadow test is partial, peaking at the half-shadow line and
@@ -1717,6 +1721,7 @@ export class Sky implements System {
    */
   private buildInteriorVolume(ctx: Ctx): InteriorVolume | null {
     const track = ctx.track;
+    if (!HAS_TUNNEL) return null;
     if (!track || !(track.length > 1)) return null;
 
     const pts: THREE.Vector3[] = [];

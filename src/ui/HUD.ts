@@ -491,7 +491,7 @@ export class HUD implements System {
     for (let i = 0; i < 3; i++) {
       const a = -90 + i * 120;
       ticks += `<g transform="rotate(${a} 100 100)">` +
-        '<path d="M100 6 L112 26 L100 20 L88 26 Z" fill="#4fc3ff" opacity="0.92"/>' +
+        '<path d="M100 6 L112 26 L100 20 L88 26 Z" fill="#4fe8ff" opacity="0.92"/>' +
         '</g>';
     }
     this.countTicks.innerHTML = ticks + '</svg>';
@@ -712,9 +712,9 @@ export class HUD implements System {
     // whole ramp at low alpha behind the fill, which came out grey on the left
     // half and brown on the right and read as a rendering fault.
     const grd = g.createLinearGradient(cx - r, cy + r * 0.35, cx + r, cy - r * 0.55);
-    grd.addColorStop(0.00, '#fff4e2');
-    grd.addColorStop(0.45, '#ffcf6b');
-    grd.addColorStop(1.00, '#e0453f');
+    grd.addColorStop(0.00, '#f0f6ff');
+    grd.addColorStop(0.45, '#6be8ff');
+    grd.addColorStop(1.00, '#ff2d95');
     this.arcGrad = grd;
   }
 

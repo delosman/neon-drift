@@ -14,6 +14,7 @@ import { Sky } from './render/Sky';
 import { Materials } from './render/Materials';
 import { Track } from './world/Track';
 import { Scenery } from './world/Scenery';
+import { ACTIVE_TRACK } from './world/TrackDefs';
 import { Effects } from './fx/Effects';
 import { Items } from './game/Items';
 import { Race } from './game/Race';
@@ -147,7 +148,7 @@ const systems: System[] = [
 /** Human-readable names for the boot progress readout, indexed with `systems`. */
 const SYSTEM_LABELS = [
   'starting renderer', 'reading controls', 'raising the sun', 'mixing materials',
-  'laying the circuit', 'dressing the bay', 'rolling out the grid', 'loading item boxes',
+  'laying the circuit', ACTIVE_TRACK.dressLabel, 'rolling out the grid', 'loading item boxes',
   'lighting the effects', 'mounting the camera', 'drawing the hud', 'tuning the engines',
   'balancing the frame',
 ];

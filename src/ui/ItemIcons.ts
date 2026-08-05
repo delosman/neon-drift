@@ -82,7 +82,7 @@ export const ITEM_TINT: Record<number, string> = {
   [ItemKind.Banana]: '#ffd447',
   [ItemKind.Star]: '#ffd76b',
   [ItemKind.Bolt]: '#ffe066',
-  [ItemKind.Bomb]: '#e0453f',
+  [ItemKind.Bomb]: '#ff2d95',
 };
 
 /** Cycling order for the roulette — mixes hues so the spin looks lively. */

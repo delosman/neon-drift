@@ -339,7 +339,7 @@ html[data-kc-open] .kr-screens { opacity: 0; }
 .kc-title {
   font-size: clamp(15px, 3.1vmin, 26px); font-weight: 900; letter-spacing: .12em;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #fff 10%, #ffd27a 62%, #f0a23c 100%);
+  background: linear-gradient(180deg, #fff 10%, #ffb2ec 62%, #f03cc0 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .kc-done {
@@ -394,7 +394,7 @@ html[data-kc-open] .kr-screens { opacity: 0; }
 }
 .kc-g-tilt b {
   width: 34%; height: 34%; left: 33%; top: 33%;
-  background: radial-gradient(circle at 40% 35%, #fff, #4fc3ff);
+  background: radial-gradient(circle at 40% 35%, #fff, #4fe8ff);
 }
 .kc-g-pads i, .kc-g-pads b {
   width: 42%; height: 62%; top: 19%; border-radius: 5px;
@@ -410,7 +410,7 @@ html[data-kc-open] .kr-screens { opacity: 0; }
   font-size: clamp(10px, 1.8vmin, 14px); letter-spacing: .12em;
   text-transform: uppercase; color: #a9b6c9;
 }
-.kc-meter-num { font-variant-numeric: tabular-nums; color: #ffd27a; font-weight: 800; }
+.kc-meter-num { font-variant-numeric: tabular-nums; color: #ff9de0; font-weight: 800; }
 .kc-meter-track {
   position: relative; height: 14px; border-radius: 999px;
   background: rgba(8,13,24,.75); border: 1.5px solid rgba(255,255,255,.18);
@@ -419,7 +419,7 @@ html[data-kc-open] .kr-screens { opacity: 0; }
 .kc-meter-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,.35); }
 .kc-meter-fill {
   position: absolute; top: 0; bottom: 0; left: 50%; width: 0;
-  background: linear-gradient(90deg, #6ad2ff, #ffd27a);
+  background: linear-gradient(90deg, #4fe8ff, #ff6ec7);
   box-shadow: 0 0 10px rgba(255,200,120,.6);
 }
 

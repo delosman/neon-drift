@@ -255,7 +255,7 @@ const ALIASES: Record<string, MaterialName> = {
 };
 
 /** The village pastels from the art bible, in roof-to-wall order. */
-export const STUCCO_TINTS = [0xf2c9a0, 0xe8a5a0, 0xf5e2b0, 0xa9c8d4, 0xdcb8d8, 0xefd9c0, 0xd8c6a8, 0xc9d8cf];
+export const STUCCO_TINTS = [0xe8b8e4, 0xf0a0c8, 0xc9b8f0, 0x9ad4e8, 0xdcb8d8, 0xd9c2ec, 0xb0c4ec, 0xa9dcd4];
 
 interface Entry {
   mat: THREE.Material;
@@ -1586,7 +1586,7 @@ function patchEnvRadiance(mat: THREE.Material, patch: EnvPatch): void {
  * Inject AFTER any other `onBeforeCompile` on the material: this one chains the
  * previous hook and its cache key rather than replacing them.
  */
-export const ENV_GROUND = { ground: 0x6d5b4a, horizon: 0xb08a63, amount: 0.88 } as const;
+export const ENV_GROUND = { ground: 0x4a3f6e, horizon: 0xb070b8, amount: 0.88 } as const;
 
 /**
  * Emissive clamp and LOD bias for the boost pad.
@@ -2043,8 +2043,8 @@ export class Materials implements System {
       case 'foliage-leaf': return this.buildLeafCard(size, false);
       case 'palm-frond': return this.buildLeafCard(size, true);
       case 'crowd': return this.buildCrowd(size);
-      case 'tunnel-light': return this.buildLightStrip(size, 0xffb264, 2.4);
-      case 'neon': return this.buildLightStrip(size, 0x4fc3ff, 2.1);
+      case 'tunnel-light': return this.buildLightStrip(size, 0xff6ee0, 2.4);
+      case 'neon': return this.buildLightStrip(size, 0x4fe8ff, 2.1);
       default:
         // Unknown name: a loud magenta so it is caught in review, not shipped.
         return { mat: new THREE.MeshStandardMaterial({ color: 0xff00aa, roughness: 0.6 }), textures: [] };
@@ -2141,7 +2141,7 @@ export class Materials implements System {
     // the voids between the chippings, so the binder goes much darker while the
     // stone crowns standing proud of the film stay close to dry. That contrast
     // *inversion* is what makes a wet road read as wet rather than as painted.
-    const binder = rgb(wet ? 0x33333c : racingLine ? 0x43434d : 0x4a4a52);
+    const binder = rgb(wet ? 0x2e2e44 : racingLine ? 0x3b3b58 : 0x42425e);
     // Chippings are a VALUE break in the binder, not a hue break. A warm grey
     // this far from the binder's cool violet survives the golden-hour key and
     // the 1.12 saturation lift as orange confetti sprinkled on lavender, which
@@ -2527,8 +2527,8 @@ export class Materials implements System {
       b: macroField(MACRO_RES, { freq: 3, octaves: 2, warp: 0.10, seed: 58, clip: 0.05 }),
     });
 
-    const red = rgb(0xe0453f);
-    const white = rgb(0xf2ece0);
+    const red = rgb(0xff2d95);
+    const white = rgb(0xe6f8ff);
     const concreteC = rgb(0x9d9589);
     const rubberC = rgb(0x3a3a40);
     const bands = 4; // two red + two white per tile
@@ -2678,10 +2678,10 @@ export class Materials implements System {
       b: macroField(MACRO_RES, { freq: 3, octaves: 2, warp: 0.10, seed: 69, clip: 0.05 }),
     });
 
-    const dry = rgb(0xe3c893);
-    const wet = rgb(0xa98f63);
-    const shellC = rgb(0xf4ece0);
-    const dark = rgb(0xc7a97a);
+    const dry = rgb(0xd9b9de);
+    const wet = rgb(0x8d6f9e);
+    const shellC = rgb(0xf0ecfa);
+    const dark = rgb(0xb193c4);
 
     for (let y = 0; y < size; y++) {
       const v = (y + 0.5) / size;
@@ -2785,11 +2785,11 @@ export class Materials implements System {
     // the turf above 35 cm, so half of it was being thrown away
     const tussock = fbmField(size, { freq: 2, octaves: 2, seed: 78, warp: 0.09, normalize: 0.03 });
 
-    const dark = rgb(0x4e7434);
-    const mid = rgb(0x6f9b47);
-    const tip = rgb(0x87b356);
-    const dryC = rgb(0xb5a35c);
-    const soil = rgb(0x6b5238);
+    const dark = rgb(0x156353);
+    const mid = rgb(0x22836e);
+    const tip = rgb(0x35ab8e);
+    const dryC = rgb(0x58a487);
+    const soil = rgb(0x574a70);
 
     for (let i = 0; i < size * size; i++) {
       const b = blade[i] * 0.65 + blade2[i] * 0.35;
@@ -2881,10 +2881,10 @@ export class Materials implements System {
       b: macroField(MACRO_RES, { freq: 3, octaves: 2, warp: 0.10, seed: 88, clip: 0.05 }),
     });
 
-    const earth = rgb(0x77604a);
-    const pale = rgb(0x9c8a70);
-    const rich = rgb(0x584434);
-    const pebC = rgb(0x8f8577);
+    const earth = rgb(0x635478);
+    const pale = rgb(0x8d7fa4);
+    const rich = rgb(0x453a5c);
+    const pebC = rgb(0x7f7a94);
 
     for (let i = 0; i < size * size; i++) {
       const pebMask = smoothstep(0.24, 0.1, peb.f1[i]) * (hash2(peb.id[i], 2, 4) > 0.55 ? 1 : 0);
@@ -2984,8 +2984,8 @@ export class Materials implements System {
     });
     const bench = fbmField(size, { freq: 2, octaves: 2, seed: 100, stretchY: 3.6, warp: 0.05, normalize: 0.03 });
 
-    const stone = rgb(0xa8927a);
-    const shade = rgb(0x6d5d4c);
+    const stone = rgb(0x8f86b0);
+    const shade = rgb(0x4c4468);
     // The bleach was the source of the orange: pushed by the golden-hour key and
     // the saturation lift, #c9b79c goes tangerine. Cooled and pulled back so the
     // face reads as the bible's #a8927a limestone at any exposure.
@@ -2996,8 +2996,8 @@ export class Materials implements System {
     // §3's stone is #a8927a. The pale beds are still pale — they are just pale
     // *limestone* now, and the range they used to spend going toward white is
     // spent going toward the shade colour instead, which is where the reading is.
-    const bleach = rgb(0xb2a48e);
-    const lichenC = rgb(0x85946a);
+    const bleach = rgb(0xa89cc4);
+    const lichenC = rgb(0x5f8f96);
 
     for (let i = 0; i < size * size; i++) {
       const band = strata[i];
@@ -3205,10 +3205,10 @@ export class Materials implements System {
     // sodium strip. The palette is lifted at the dark end and the swings that
     // feed it are compressed; the missing contrast comes back as *form* from the
     // macro albedo bands below, which is where it belongs.
-    const cut = rgb(0x9c8974);
-    const deep = rgb(0x7b6b5a);
-    const wet = rgb(0x625648);
-    const dust = rgb(0xb3a794);
+    const cut = rgb(0x83789e);
+    const deep = rgb(0x645a7e);
+    const wet = rgb(0x4d4464);
+    const dust = rgb(0x9d95b8);
 
     for (let i = 0; i < size * size; i++) {
       const arc = smoothstep(0.42, 0.9, arcs[i]);
@@ -3335,8 +3335,8 @@ export class Materials implements System {
       b: macroField(MACRO_RES, { freq: 3, octaves: 2, warp: 0.10, seed: 108, clip: 0.05 }),
     });
 
-    const pal = [rgb(0xb8a68c), rgb(0xa6947c), rgb(0xc4b49a), rgb(0x9d8d76), rgb(0xb0a48e)];
-    const mortar = rgb(0x9a9084);
+    const pal = [rgb(0x9d92c0), rgb(0x8a7fae), rgb(0xaba0cc), rgb(0x7d74a0), rgb(0x968cba)];
+    const mortar = rgb(0x8781a0);
 
     for (let i = 0; i < size * size; i++) {
       const e = bf.edge[i];
@@ -4032,7 +4032,7 @@ export class Materials implements System {
     const fade = fbmField(size, { freq: 4, octaves: 3, seed: 182, warp: 0.05 });
     const grain = grainField(size, 183);
 
-    const light = rgb(0xf2ece0);
+    const light = rgb(0xe6ecfa);
     const tintable = rgb(0xb2b2b2); // multiplied by variant colour
     const threads = 96;
 
@@ -4252,7 +4252,7 @@ export class Materials implements System {
 
     const plate = rgb(0x27303f);
     const plateWorn = rgb(0x39445a);
-    const glow = rgb(0x4fc3ff);
+    const glow = rgb(0x4fe8ff);
     const glowHot = rgb(0xdcf4ff);
 
     for (let y = 0; y < size; y++) {
@@ -4370,7 +4370,7 @@ export class Materials implements System {
       emissiveIntensity: intensity,
       envMapIntensity: 0.4,
     });
-    if (hex === 0x4fc3ff) this.neonMat = mat;
+    if (hex === 0x4fe8ff) this.neonMat = mat;
     return { mat, textures: [...m.all, emissiveMap] };
   }
 
@@ -4408,7 +4408,7 @@ export class Materials implements System {
     // to catch the sun. 0.95 was nowhere near enough tilt to do it.
     const m = this.maps(f, { normalStrength: 2.4 });
     const uTime = { value: 0 };
-    const uShallow = { value: new THREE.Color(0x3fc9c4) };
+    const uShallow = { value: new THREE.Color(0x22e0cc) };
     const uDeep = { value: new THREE.Color(0x0d5a7a) };
     const mat = this.phys(m, {
       color: 0xffffff,
@@ -4532,7 +4532,7 @@ export class Materials implements System {
 
     const bark = rgb(0x8a7359);
     const darkC = rgb(0x5d4c3b);
-    const paleC = rgb(0xa8927a);
+    const paleC = rgb(0x9c92bc);
 
     for (let i = 0; i < size * size; i++) {
       const lu = bf.lu[i];
@@ -4729,7 +4729,7 @@ export class Materials implements System {
     const ch = size / rows;
     const rnd = mulberry32(4711);
 
-    const shirts = [0xe0453f, 0x4fc3ff, 0xf5e2b0, 0x6f9b47, 0xdcb8d8, 0xff9d2e, 0xf2ece0, 0xa9c8d4];
+    const shirts = [0xff2d95, 0x4fe8ff, 0xc9b8f0, 0x2f9c85, 0xdcb8d8, 0xff6ee0, 0xe6f8ff, 0x9ad4e8];
     const skins = [0xf0c9a2, 0xd6a074, 0xa9744c, 0x7a4f30, 0xf7dcc0];
 
     for (let r = 0; r < rows; r++) {
@@ -4836,7 +4836,7 @@ export class Materials implements System {
     g.fillRect(0, 0, size, size);
 
     // horizontal colour bands
-    const bands = ['#e0453f', '#f5e2b0', '#4fc3ff', '#f2ece0'];
+    const bands = ['#ff2d95', '#c9b8f0', '#4fe8ff', '#e6f8ff'];
     for (let i = 0; i < 4; i++) {
       g.fillStyle = bands[i];
       g.fillRect(0, (size * i) / 4, size, size / 4);

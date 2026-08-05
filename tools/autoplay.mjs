@@ -82,6 +82,7 @@ const opt = (name, dflt) => {
  */
 const PORT = parseInt(opt('--port', process.env.AUTOPLAY_PORT || '5327'), 10);
 const QUALITY = opt('--quality', 'low');
+const TRACK = opt('--track', '');
 const REALTIME = flag('--realtime');
 
 // ---------------------------------------------------------------------------
@@ -220,7 +221,7 @@ async function advance(seconds, wallMs = 120000) {
 }
 
 const t0 = Date.now();
-await page.goto(`http://127.0.0.1:${PORT}/?quality=${QUALITY}&scale=0.5`,
+await page.goto(`http://127.0.0.1:${PORT}/?quality=${QUALITY}&scale=0.5${TRACK ? `&track=${TRACK}` : ''}`,
   { waitUntil: 'domcontentloaded', timeout: 90000 });
 await page.waitForFunction('window.__gameReady === true', { timeout: 180000 });
 console.log(`booted in ${((Date.now() - t0) / 1000).toFixed(1)}s  (quality=${QUALITY}, port=${PORT})`);

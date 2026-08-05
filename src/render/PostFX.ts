@@ -721,8 +721,11 @@ export class GradeEffect extends Effect {
         // (0.9892 against 0.9825) — so the road desaturates a little rather
         // than gaining more colour, and §9.6's "no pure-black shadows" gains a
         // hair of headroom at the same time.
-        ['coolTint', new THREE.Uniform(new THREE.Vector3(0.900, 1.010, 1.045))],
-        ['warmTint', new THREE.Uniform(new THREE.Vector3(1.115, 1.005, 0.878))],
+        // Synthwave split-tone: cyan shadows, magenta highlights. Same total
+        // luminance discipline as the teal/amber pair it replaces — the tints
+        // rotate hue, they do not add energy.
+        ['coolTint', new THREE.Uniform(new THREE.Vector3(0.868, 1.005, 1.085))],
+        ['warmTint', new THREE.Uniform(new THREE.Vector3(1.105, 0.955, 1.045))],
         // Additive teal lift on the bottom of the curve — art bible §2 asks for
         // a #a8c8ff sky fill in the shadows, and nothing multiplicative can
         // produce it. Sized to sit just above the noise floor of an 8-bit write.
@@ -742,7 +745,7 @@ export class GradeEffect extends Effect {
         // frame — that milks the blacks instead of tinting them, and it is the
         // regression the last round spent itself undoing. The floor has to come
         // from the sky-fill ambient in Sky.ts, not from the grade.
-        ['shadowLift', new THREE.Uniform(new THREE.Vector3(-0.00090, 0.00250, 0.00300))],
+        ['shadowLift', new THREE.Uniform(new THREE.Vector3(-0.00090, 0.00215, 0.00385))],
         // Highlight shoulder: knee just above sunlit diffuse white, then
         // x^0.72 above it, with only a light pull toward luminance so a hot
         // colour stays a colour until it is genuinely an order of magnitude
@@ -1193,8 +1196,6 @@ export class PostFX {
         luminanceThreshold: opts.ldr === true ? 0.78 : 1.55,
         luminanceSmoothing: 0.32,
         mipmapBlur: true,
-        // Slightly hotter to pay back the pixels the higher threshold removed:
-        // fewer sources, each allowed to glow harder.
         intensity: 0.88,
         // Wide and soft — a big mip chain with a high radius reads as a lens,
         // a small one reads as a glow filter.
@@ -1267,8 +1268,10 @@ export class PostFX {
       samples,
       exposure: 1.05,
       contrast: 0.18,
-      saturation: 1.12,
-      vignette: 0.22,
+      // A notch up for the neon palette — the split-tone rotates hue, this
+      // makes the rotated colour commit.
+      saturation: 1.22,
+      vignette: 0.24,
       // Trimmed with the shadow rolloff added in the shader — the grain was
       // never the coloured speckle the review saw, but at 0.012 flat it was
       // still +/-1.8 counts of white noise sitting on top of the darkest eighth

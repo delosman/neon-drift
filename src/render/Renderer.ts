@@ -814,7 +814,7 @@ export class RenderPipeline implements System {
     const scene = new THREE.Scene();
     const geo = new THREE.PlaneGeometry(4, 4);
     const mat = new THREE.MeshPhysicalMaterial({
-      color: 0xe0453f, metalness: 0, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06,
+      color: 0xff2d95, metalness: 0, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06,
     });
     // Named so `#define SHADER_NAME` carries it: three uses the material's name
     // for that define and leaves it EMPTY when there is none, which is exactly

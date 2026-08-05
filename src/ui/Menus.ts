@@ -13,8 +13,24 @@
 import { RaceState, type Ctx, type IKart, type KartStats } from '../types';
 import { el, formatClock, ordinalSuffix, cssColor, clamp } from './uiUtil';
 import { ControlsMenu } from './ControlsMenu';
+import { TRACKS, TRACK_ID, TRACK_NAME, TRACK_STORAGE_KEY } from '../world/TrackDefs';
 
-export type ScreenName = 'none' | 'title' | 'select' | 'pause' | 'results';
+export type ScreenName = 'none' | 'title' | 'track' | 'select' | 'pause' | 'results';
+
+/** one-line character blurb per circuit, shown on its select card */
+const TRACK_TAGLINES: Record<string, string> = {
+  'sunset-bay': 'Harbour, village esses, cliff tunnel, banked 180',
+  'neon-horizon': 'Shore straight, ridge climb, high banked carousel',
+};
+
+/**
+ * Picking a different circuit rebuilds the whole world, and the world is baked
+ * once at module scope — so the honest transition is a reload. This flag
+ * carries the menu through it: set before `location.reload()`, read in the
+ * constructor, so the player lands back on the select flow rather than the
+ * title card.
+ */
+const JUMP_KEY = 'kr.menu-jump';
 
 /** Stat display ranges — the roster multipliers live inside these. */
 const STAT_RANGE: [number, number] = [0.74, 1.24];
@@ -29,31 +45,31 @@ const LOGO_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" class="kr-logo">
   <defs>
     <linearGradient id="krGold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#fffdf2"/>
-      <stop offset="32%"  stop-color="#ffe6a6"/>
-      <stop offset="58%"  stop-color="#ffc23f"/>
-      <stop offset="82%"  stop-color="#f28c14"/>
-      <stop offset="100%" stop-color="#d1590c"/>
+      <stop offset="0%"   stop-color="#fdf6ff"/>
+      <stop offset="32%"  stop-color="#ffc2ee"/>
+      <stop offset="58%"  stop-color="#ff4fc0"/>
+      <stop offset="82%"  stop-color="#d232e8"/>
+      <stop offset="100%" stop-color="#8a1fd4"/>
     </linearGradient>
     <linearGradient id="krCream" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%"   stop-color="#ffffff"/>
-      <stop offset="42%"  stop-color="#fdf1da"/>
-      <stop offset="76%"  stop-color="#e8c79a"/>
-      <stop offset="100%" stop-color="#bd9266"/>
+      <stop offset="42%"  stop-color="#e2f6ff"/>
+      <stop offset="76%"  stop-color="#9adcf2"/>
+      <stop offset="100%" stop-color="#5f8fd4"/>
     </linearGradient>
     <linearGradient id="krSwoosh" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#ff7a3d" stop-opacity="0"/>
-      <stop offset="30%"  stop-color="#ff9a3d" stop-opacity="0.95"/>
-      <stop offset="70%"  stop-color="#ffd05a" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#fff0c0" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#b03df0" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#ff3fa8" stop-opacity="0.95"/>
+      <stop offset="70%"  stop-color="#4fe8ff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#d8fbff" stop-opacity="0"/>
     </linearGradient>
     <radialGradient id="krBurst" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#ffd58a" stop-opacity="0.55"/>
-      <stop offset="55%"  stop-color="#ff9a3d" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#ff7a3d" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#ff9de0" stop-opacity="0.55"/>
+      <stop offset="55%"  stop-color="#c25cff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#7a3dff" stop-opacity="0"/>
     </radialGradient>
     <pattern id="krCheck" width="24" height="24" patternUnits="userSpaceOnUse">
-      <rect width="24" height="24" fill="#f6efe0"/>
+      <rect width="24" height="24" fill="#eef2ff"/>
       <rect width="12" height="12" fill="#181425"/>
       <rect x="12" y="12" width="12" height="12" fill="#181425"/>
     </pattern>
@@ -120,7 +136,7 @@ function buildRays() {
     const R = 560;
     const x0 = 450 + Math.cos(a0) * R, y0 = 200 + Math.sin(a0) * R * 0.62;
     const x1 = 450 + Math.cos(a1) * R, y1 = 200 + Math.sin(a1) * R * 0.62;
-    s += `<path d="M450 200 L${x0.toFixed(1)} ${y0.toFixed(1)} L${x1.toFixed(1)} ${y1.toFixed(1)} Z" fill="#ffbe62" opacity="0.11"/>`;
+    s += `<path d="M450 200 L${x0.toFixed(1)} ${y0.toFixed(1)} L${x1.toFixed(1)} ${y1.toFixed(1)} Z" fill="#ff6ec7" opacity="0.13"/>`;
   }
   return s;
 }
@@ -148,6 +164,9 @@ export class Menus {
 
   private selected = 0;
   private cards: HTMLDivElement[] = [];
+  /** track-select screen state; index into TRACKS */
+  private trackSelected = Math.max(0, TRACKS.findIndex((t) => t.id === TRACK_ID));
+  private trackCards: HTMLDivElement[] = [];
   private buttons: { pause: HTMLDivElement[]; results: HTMLDivElement[] } = { pause: [], results: [] };
   private btnIndex = 0;
 
@@ -183,10 +202,20 @@ export class Menus {
     this.controls = new ControlsMenu(parent);
     this.screens = {
       title: this.buildTitle(),
+      track: this.buildTrack(),
       select: this.buildSelect(),
       pause: this.buildPause(),
       results: this.buildResults(),
     };
+    // Returning from a track-swap reload: skip the title card, land on the
+    // stage the player was mid-flow through.
+    try {
+      const jump = sessionStorage.getItem(JUMP_KEY);
+      if (jump === 'track' || jump === 'select') {
+        this.stage = jump;
+        sessionStorage.removeItem(JUMP_KEY);
+      }
+    } catch { /* privacy mode: start at the title as normal */ }
     // one delegated listener rather than a handler per control
     this.root.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
@@ -204,7 +233,7 @@ export class Menus {
     });
 
     const forced = new URLSearchParams(location.search).get('ui');
-    if (forced === 'title' || forced === 'select' || forced === 'pause' || forced === 'results') {
+    if (forced === 'title' || forced === 'track' || forced === 'select' || forced === 'pause' || forced === 'results') {
       this.forced = forced;
     }
   }
@@ -273,7 +302,7 @@ export class Menus {
 
     let want: ScreenName;
     if (this.forced) want = this.forced;
-    else if (race.state === RaceState.Menu || this.localTitle) want = this.selecting ? 'select' : 'title';
+    else if (race.state === RaceState.Menu || this.localTitle) want = this.stage;
     else if (race.state === RaceState.Paused || this.localPause) want = 'pause';
     else if (race.state === RaceState.Finished || race.state === RaceState.Results) want = 'results';
     else want = 'none';
@@ -303,7 +332,7 @@ export class Menus {
       this.btnIndex = 0;
       this.syncButtons();
     }
-    this.blocking = want === 'title' || want === 'select' || want === 'results';
+    this.blocking = want === 'title' || want === 'track' || want === 'select' || want === 'results';
 
     // Inline, not stylesheet: the HUD layer sets `pointer-events: none` with
     // enough specificity that an appended `.kr-screen.on` rule loses, and a
@@ -337,7 +366,8 @@ export class Menus {
     else document.documentElement.dataset.menu = want;
   }
 
-  private selecting = false;
+  /** which menu screen the pre-race flow is on: title → track → select */
+  private stage: 'title' | 'track' | 'select' = 'title';
 
   // ------------------------------------------------------------------ input
 
@@ -345,6 +375,9 @@ export class Menus {
     if (this.screen === 'select') {
       this.selected = (this.selected + dir + this.cards.length) % this.cards.length;
       this.syncCards();
+    } else if (this.screen === 'track') {
+      this.trackSelected = (this.trackSelected + dir + this.trackCards.length) % this.trackCards.length;
+      this.syncTrackCards();
     } else if (this.screen === 'pause' || this.screen === 'results') {
       const list = this.screen === 'pause' ? this.buttons.pause : this.buttons.results;
       this.btnIndex = (this.btnIndex + dir + list.length) % list.length;
@@ -362,7 +395,11 @@ export class Menus {
   private onConfirm(ctx: Ctx, inRace: boolean) {
     switch (this.screen) {
       case 'title':
-        this.selecting = true;
+        this.stage = 'track';
+        this.ui('confirm');
+        return;
+      case 'track':
+        this.confirmTrack();
         this.ui('confirm');
         return;
       case 'select':
@@ -385,10 +422,33 @@ export class Menus {
     this.ctx?.bus.emit({ type: 'ui', name });
   }
 
+  /**
+   * The chosen circuit either is the one already baked — walk on to the racer
+   * roster — or it is not, in which case the world has to be rebuilt from its
+   * def and the only honest rebuild is a reload (the whole world is baked once
+   * at module scope; see TrackDefs.ts). The jump flag lands the player back on
+   * the roster, so the reload reads as "next screen" behind the boot curtain.
+   */
+  private confirmTrack() {
+    const def = TRACKS[this.trackSelected];
+    if (!def || def.id === TRACK_ID) {
+      this.stage = 'select';
+      return;
+    }
+    try {
+      localStorage.setItem(TRACK_STORAGE_KEY, def.id);
+      sessionStorage.setItem(JUMP_KEY, 'select');
+    } catch { /* privacy mode: the reload still lands on the title */ }
+    // Strip a stale ?track= override so the stored choice wins after reload.
+    const url = new URL(location.href);
+    url.searchParams.delete('track');
+    location.href = url.toString();
+  }
+
   private startRace(ctx: Ctx) {
     this.forced = null;
     this.localTitle = false;
-    this.selecting = false;
+    this.stage = 'title';
     this.localPause = false;
     this.resultsBuilt = false;
     this.resultsFinished = -1;
@@ -416,7 +476,7 @@ export class Menus {
     wrap.style.flexDirection = 'column';
     wrap.style.alignItems = 'center';
     wrap.innerHTML = LOGO_SVG.replace('RAYS', buildRays());
-    el('div', 'kr-sub', wrap, 'Sunset Bay Circuit');
+    el('div', 'kr-sub', wrap, TRACK_NAME);
     // Built empty; `syncTouchCopy` fills it from `ctx.input.touch` every time
     // that flips. This used to run its OWN `matchMedia('(pointer: coarse)')`
     // probe once, in the constructor — which is exactly the check that fails on
@@ -462,6 +522,44 @@ export class Menus {
       this.titleHint.innerHTML =
         '<b>&#8592;</b><b>&#8594;</b> steer &nbsp;&nbsp; <b>&#8593;</b> accelerate &nbsp;&nbsp; ' +
         '<b>Shift</b> drift &nbsp;&nbsp; <b>Space</b> item &nbsp;&nbsp; <b>Esc</b> pause';
+    }
+  }
+
+  /**
+   * Track select. Same card grammar as the racer roster — chip, name, one
+   * line of character — so the two screens read as one flow. The card for the
+   * circuit that is already baked is pre-highlighted; confirming it walks
+   * straight on, confirming the other writes the choice and reloads (see
+   * `confirmTrack`).
+   */
+  private buildTrack() {
+    const s = this.makeScreen('kr-s-track');
+    const inner = s.firstElementChild as HTMLDivElement;
+    const head = el('div', 'kr-stage', inner);
+    el('div', 'kr-title kr-gold', head, 'Choose your circuit');
+    const roster = el('div', 'kr-roster kr-stage', inner);
+    this.trackCards.length = 0;
+    TRACKS.forEach((def, i) => {
+      const c = el('div', 'kr-card kr-card-track', roster);
+      c.style.setProperty('--c', i === 0 ? '#ffcf6b' : '#ff2d95');
+      const chip = el('div', 'kr-card-chip', c);
+      el('div', 'kr-card-init', chip, def.name.charAt(0).toUpperCase());
+      if (def.id === TRACK_ID) el('div', 'kr-card-you', c, 'Now');
+      el('div', 'kr-card-name', c, def.name);
+      el('div', 'kr-card-tag', c, TRACK_TAGLINES[def.id] ?? '');
+      c.onclick = () => { this.trackSelected = i; this.syncTrackCards(); };
+      this.trackCards.push(c);
+    });
+    this.syncTrackCards();
+    const go = el('div', 'kr-menu-list kr-stage', inner);
+    const btn = el('div', 'kr-btn sel', go, 'Confirm circuit');
+    btn.onclick = () => this.confirmTrack();
+    return s;
+  }
+
+  private syncTrackCards() {
+    for (let i = 0; i < this.trackCards.length; i++) {
+      this.trackCards[i].classList.toggle('sel', i === this.trackSelected);
     }
   }
 
@@ -569,7 +667,7 @@ export class Menus {
       this.localPause = false;
       this.forced = null;
       this.localTitle = true;
-      this.selecting = false;
+      this.stage = 'title';
       this.ctx.race.reset();
     };
     this.buttons.pause = [resume, ctrl, restart, quit];
@@ -591,7 +689,7 @@ export class Menus {
     const again = el('div', 'kr-btn', list, 'Race again');
     again.onclick = () => this.startRace(this.ctx);
     const title = el('div', 'kr-btn', list, 'Back to title');
-    title.onclick = () => { this.localTitle = true; this.selecting = false; this.forced = null; this.ctx.race.reset(); };
+    title.onclick = () => { this.localTitle = true; this.stage = 'title'; this.forced = null; this.ctx.race.reset(); };
     this.buttons.results = [again, title];
     return s;
   }

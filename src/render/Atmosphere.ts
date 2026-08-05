@@ -82,12 +82,16 @@ export const SUN_DIRECTION = (() => {
   // is untouched by construction
   return new THREE.Vector3(x * c - z * s, v.y, x * s + z * c).normalize();
 })();
-/** Key light colour, art bible §2. */
-export const SUN_LIGHT_COLOR = 0xffd9a8;
-/** Warm ground bounce, art bible §2. */
-export const GROUND_BOUNCE_COLOR = 0xc98f5a;
-/** Cool sky fill, art bible §2. */
-export const SKY_FILL_COLOR = 0xa8c8ff;
+/**
+ * Key light colour — synthwave restyle. The bible's golden-hour 0xffd9a8 moves
+ * to a warm neon pink; still warm enough to read as a low sun, saturated
+ * enough that every lit flank carries the magenta half of the split.
+ */
+export const SUN_LIGHT_COLOR = 0xffb4c4;
+/** Ground bounce follows the sand/tarmac shift: dusty violet, not amber. */
+export const GROUND_BOUNCE_COLOR = 0x9a62b8;
+/** Cool fill goes full cyan — the other half of the synthwave split. */
+export const SKY_FILL_COLOR = 0x7edcff;
 /**
  * Direction TOWARD the cool fill: 35° up, on the ANTI-solar side.
  *
@@ -133,9 +137,15 @@ export const SKY_FILL_COLOR = 0xa8c8ff;
 export const SKY_FILL_DIRECTION = new THREE.Vector3(
   -SUN_DIRECTION.x * 3.4, 1.0, -SUN_DIRECTION.z * 3.4,
 ).normalize();
-/** Target displayed sky colours after tone mapping. */
-export const SKY_ZENITH_TARGET = 0x3f74c4;
-export const SKY_HORIZON_TARGET = 0xffd0a0;
+/**
+ * Target displayed sky colours after tone mapping — the two-point calibration
+ * the whole atmosphere solves against. Synthwave dusk: deep indigo-violet
+ * overhead falling to a hot pink horizon. The Nishita solver re-fits its
+ * Rayleigh gains against these at boot, so the dome, the env map and the fog
+ * all land on the new palette together.
+ */
+export const SKY_ZENITH_TARGET = 0x4a54c8;
+export const SKY_HORIZON_TARGET = 0xffaec6;
 
 // --- model constants ---------------------------------------------------------
 
@@ -175,8 +185,8 @@ const MIE_ISOTROPIC = 0.12;
 const RAYLEIGH_BACKSCATTER = 0.40;
 /** Arbitrary radiometric scale; the calibration layer removes the ambiguity. */
 const SUN_ENERGY = 22;
-/** Aerosols here are warm — this is what gives the disc its golden collar. */
-const MIE_TINT = [1.0, 0.78, 0.52];
+/** Aerosols run magenta — this is what gives the disc its neon collar. */
+const MIE_TINT = [1.0, 0.62, 0.78];
 /**
  * Elevation (dir.y) at which the horizon gain has fully handed over to zenith.
  * 0.42 rather than 0.35: the warm band has to survive up to ~25° or the sky

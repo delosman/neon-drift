@@ -4,6 +4,18 @@
 working in parallel produce one coherent-looking game instead of eleven
 tech demos. Where this document and your own taste disagree, this wins.
 
+> **FORK NOTE — synthwave restyle (2026-08).** This fork moved the whole game
+> from the golden-hour coastal palette documented below to a neon synthwave
+> dusk: indigo-violet zenith (`#4a54c8`) to hot pink horizon (`#ffaec6`), pink
+> key / cyan fill / violet bounce, blue-violet tarmac (`#42425e`), magenta
+> kerbs (`#ff2d95`) against ice cyan (`#e6f8ff`), teal turf, neon cyan water.
+> The *structure* of every rule below (value discipline, two-point sky
+> calibration, hue-of-accent conventions, ratios) still governs; only the hue
+> table has rotated. Current hexes live in code: `Atmosphere.ts`,
+> `TrackGeometry.ts` `C_*`, `Props.ts` `PAL`, `Materials.ts`, `ui.css` tokens.
+> The fork also added a second circuit (**Neon Horizon GP**) defined in
+> `src/world/TrackDefs.ts`.
+
 ---
 
 ## 1. The course: **Sunset Bay Circuit**

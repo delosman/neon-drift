@@ -51,9 +51,9 @@ import { DecalTile, Decals } from './Decals';
 // --- palette (art bible §3) -------------------------------------------------
 const C_TIER = [
   new THREE.Color(0xffffff),
-  new THREE.Color(0x4fc3ff),
-  new THREE.Color(0xff9d2e),
-  new THREE.Color(0xc05cff),
+  new THREE.Color(0x4fe8ff),
+  new THREE.Color(0xff3fa8),
+  new THREE.Color(0xb44fff),
 ];
 /**
  * Authoring colour for anything emitted on a live tier CHANNEL. The particle
@@ -135,12 +135,12 @@ const C_SMOKE_DARK = new THREE.Color(0x64656e);
 const C_WATER = new THREE.Color(0xbfe6ff);
 const C_FOAM = new THREE.Color(0xeefaff);
 const C_GOLD = new THREE.Color(0xffd36b);
-const C_SUNMOTE = new THREE.Color(0xffe2b4);
+const C_SUNMOTE = new THREE.Color(0xffc2e0);
 const C_SPARK_WHITE = new THREE.Color(0xfff4e0);
 const C_DEBRIS = new THREE.Color(0x3a3530);
 const CONFETTI = [
-  new THREE.Color(0xe0453f), new THREE.Color(0x4fc3ff), new THREE.Color(0xffd36b),
-  new THREE.Color(0x87b356), new THREE.Color(0xdcb8d8), new THREE.Color(0xf2ece0),
+  new THREE.Color(0xff2d95), new THREE.Color(0x4fe8ff), new THREE.Color(0xc9b8f0),
+  new THREE.Color(0x3fbda0), new THREE.Color(0xdcb8d8), new THREE.Color(0xe6f8ff),
 ];
 
 // --- module-scope scratch: the hot path allocates nothing --------------------

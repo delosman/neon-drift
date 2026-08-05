@@ -20,6 +20,7 @@ import type { Ctx, System, TrackSample } from '../types';
 import { Surface } from '../types';
 import { Water, type SeaField } from './Water';
 import { Foliage } from './Foliage';
+import { ACTIVE_TRACK } from './TrackDefs';
 import {
   GeoAccum,
   InstSet,
@@ -328,13 +329,19 @@ export class Scenery implements System {
 
     this.makeSets();
     this.dressStartStraight();
-    this.dressHarbour();
-    this.dressVillage();
-    this.dressCliff();
-    this.dressBeach();
-    this.dressBankedCurve();
-    this.dressBridgeAndHeadland();
-    this.dressOpenWater();
+    // The bespoke section dressers are authored against Sunset Bay's t-ranges
+    // (harbour at 0.10–0.225, village terraces at 0.225–0.385, …), so they run
+    // only for the coastal kit. Every pass below the branch walks the whole
+    // lap and adapts to whatever layout was baked.
+    if (ACTIVE_TRACK.kit === 'coastal') {
+      this.dressHarbour();
+      this.dressVillage();
+      this.dressCliff();
+      this.dressBeach();
+      this.dressBankedCurve();
+      this.dressBridgeAndHeadland();
+      this.dressOpenWater();
+    }
     this.dressLandBands();
     // Before the backdrop, so the coverage assertion and the balance pass both
     // see what the midground has already put in the frame.
@@ -342,7 +349,9 @@ export class Scenery implements System {
     // Backdrop before the balance pass: the balance pass asks "is this side of
     // the frame empty?", and a landmark on the horizon is one of the answers.
     this.buildBackdrop();
-    this.dressFarSails();
+    // Sail traffic belongs to the coastal holiday reading; the gridline kit
+    // keeps its horizon clear for the low sun.
+    if (ACTIVE_TRACK.kit === 'coastal') this.dressFarSails();
     this.dressOpposingMidground();
     // After the midground and the backdrop (so it can see what is already in
     // the frame), before the grass: the 8-40 m outside-shoulder guarantee.
@@ -352,7 +361,7 @@ export class Scenery implements System {
     this.dressGrassBand();
     this.dressVergeTransition();
     this.dressNearFrame();
-    this.dressGulls();
+    if (ACTIVE_TRACK.kit === 'coastal') this.dressGulls();
     this.emit();
 
     ctx.scene.add(this.group);
@@ -3675,10 +3684,7 @@ export class Scenery implements System {
    *      what occupies the right third of grid.png. Angling it upstream means a
    *      driver reads it as they come to it and the back is never presented.
    */
-  private static readonly HOARDING_ZONES: [number, number][] = [
-    [0.0, 0.105],
-    [0.455, 0.605],
-  ];
+  private static readonly HOARDING_ZONES: [number, number][] = ACTIVE_TRACK.hoardingZones;
   private inHoardingZone(t: number): boolean {
     const u = ((t % 1) + 1) % 1;
     return Scenery.HOARDING_ZONES.some(([a, b]) => (a <= b ? u >= a && u <= b : u >= a || u <= b));

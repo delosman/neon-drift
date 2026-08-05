@@ -40,6 +40,7 @@ import {
 } from '../types';
 import { EPS, mtof, Synth } from './Synth';
 import { Music } from './Music';
+import { HAS_TUNNEL, TUNNEL_T0, TUNNEL_T1 } from '../world/TrackLayout';
 
 // --- module scope scratch: nothing in update() allocates ---------------------
 const _camPos = new THREE.Vector3();
@@ -1096,9 +1097,12 @@ export class Audio implements System {
     const paused = state === RaceState.Paused;
     const player = race?.player ?? null;
 
-    // Tunnel: the art bible puts it at t 0.52–0.60. Swelling the reverb return
-    // and the engine send through it costs nothing and reads instantly.
-    const inTunnel = player && player.t > 0.505 && player.t < 0.625 ? 1 : 0;
+    // Tunnel: swelling the reverb return and the engine send through it costs
+    // nothing and reads instantly. The span comes from the active track def
+    // (with a little acoustic overhang either side); a circuit without a
+    // tunnel never swells.
+    const inTunnel =
+      HAS_TUNNEL && player && player.t > TUNNEL_T0 - 0.016 && player.t < TUNNEL_T1 + 0.026 ? 1 : 0;
     if (inTunnel !== this.tunnel) {
       this.tunnel = inTunnel;
       s.glide(s.reverbReturn.gain, inTunnel ? 1.35 : 0.5, 0.25, now);

@@ -19,7 +19,8 @@ import { join } from 'node:path';
 import puppeteer from 'puppeteer';
 import { startVite } from './vite-server.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
 const argv = process.argv.slice(2);
 const arg = (n, d) => {
   const i = argv.indexOf('--' + n);
@@ -31,6 +32,11 @@ const H = parseInt(arg('h', '1080'), 10);
 const SETTLE = parseFloat(arg('settle', '3'));
 const PORT = parseInt(arg('port', '5173'), 10);
 const ONLY = (arg('only', '') || '').split(',').filter(Boolean);
+/** which circuit to capture — matches the game's ?track= id */
+const TRACK = arg('track', '');
+/** quality tier for the capture — 'high' is the art-critique standard; 'low'
+ * sidesteps a headless-only postfx blow-out on some capture machines */
+const QUALITY = arg('quality', 'high');
 
 /**
  * Each shot positions the player, optionally overrides the camera, and names
@@ -277,7 +283,10 @@ const main = async () => {
   mkdirSync(OUT, { recursive: true });
 
   const browser = await puppeteer.launch({
-    headless: 'shell',
+    // New headless (not the old shell) so the real GPU is reachable — the
+    // SwiftShader fallback renders this game's float pipeline as psychedelic
+    // garbage on some machines, and a shot of that judges nothing.
+    headless: true,
     // Must exceed the longest page-side wait, or the transport gives up before
     // the thing it is waiting on does. Puppeteer's default is 180 s, which used
     // to be comfortably above every budget here — until DRIFT_TIMEOUT went to
@@ -291,8 +300,8 @@ const main = async () => {
     protocolTimeout: (DRIFT_TIMEOUT + 60) * 1000,
     args: [
       '--no-sandbox',
-      '--enable-unsafe-swiftshader',
       '--use-gl=angle',
+      ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : []),
       '--enable-webgl',
       '--ignore-gpu-blocklist',
       '--enable-gpu-rasterization',
@@ -313,7 +322,7 @@ const main = async () => {
   });
   page.on('pageerror', (e) => errors.push('pageerror: ' + (e.stack || e.message)));
 
-  await page.goto(`http://127.0.0.1:${PORT}/?quality=high`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(`http://127.0.0.1:${PORT}/?quality=${QUALITY}${TRACK ? `&track=${TRACK}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   try {
     await page.waitForFunction('window.__gameReady === true', { timeout: 90000 });

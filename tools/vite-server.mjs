@@ -18,7 +18,8 @@ import { createConnection } from 'node:net';
 import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const root = new URL('..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 /**
  * Which directory is the process listening on `port` actually serving?
@@ -83,10 +84,12 @@ export async function startVite(port, { timeoutMs = 36000 } = {}) {
     return { adopted: true, stop() {} };
   }
 
-  const bin = join(root, 'node_modules/.bin/vite');
-  if (!existsSync(bin)) throw new Error(`vite binary not found at ${bin} — run npm install`);
+  // Run vite's JS entry with the current Node directly — immune to shell
+  // quoting (spaces in the checkout path) and identical on every platform.
+  const bin = join(root, 'node_modules/vite/bin/vite.js');
+  if (!existsSync(bin)) throw new Error(`vite entry not found at ${bin} — run npm install`);
 
-  const proc = spawn(bin, ['--port', String(port), '--strictPort'], {
+  const proc = spawn(process.execPath, [bin, '--port', String(port), '--strictPort'], {
     cwd: root,
     stdio: 'ignore',
     // Own process group, so stop() can take down anything vite itself spawned.
