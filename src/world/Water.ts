@@ -345,10 +345,17 @@ varying vec3 vShore;
 ${WAVES}
 
 // Synthwave palette (matches Atmosphere targets + PAL), in linear space.
+//
+// REWRITE NOTE. The round-2 review measured the bay as "a flat cyan sheet
+// pasted into a pink scene", and the numbers agreed: SHALLOW sat at linear
+// G 0.75 — brighter than most of the SKY — so the body colour nuked the
+// Fresnel term everywhere and no dusk ever reached the water. The body now
+// sits a stop and a half down (a believable lagoon, not a highlighter), and
+// the reflection model below is rebalanced to put the sky INTO the sea.
 const vec3 ZENITH  = vec3(0.0648, 0.0395, 0.5395);   // #4838c2
 const vec3 HORIZON = vec3(1.0000, 0.2747, 0.6308);   // #ff8fd0
-const vec3 SHALLOW = vec3(0.0160, 0.7454, 0.6038);   // #22e0cc
-const vec3 DEEP    = vec3(0.0080, 0.0103, 0.1559);   // #161a6e
+const vec3 SHALLOW = vec3(0.0086, 0.4072, 0.3372);   // #17ab9d
+const vec3 DEEP    = vec3(0.0103, 0.0103, 0.1683);   // #1a1a72
 const vec3 FOAM    = vec3(0.8228, 0.9734, 1.0000);   // #eafcff
 
 // The horizon is NOT one colour. At 14° of sun elevation it runs from a hot
@@ -362,10 +369,12 @@ const vec3 FOAM    = vec3(0.8228, 0.9734, 1.0000);   // #eafcff
 // roughly a third of the sun-ward one and it is unmistakably BLUE; at a third
 // of the luminance and twice the saturation it stops being concrete and starts
 // being the deep end of a bay.
-const vec3 HZ_ANTI = vec3(0.1520, 0.1180, 0.3400);   // counter-glow, dusk violet
+const vec3 HZ_ANTI = vec3(0.3000, 0.1450, 0.3900);   // counter-glow, rose-violet — every azimuth carries the dusk
 
-/** Peak Fresnel. See the file header, fault (1). */
-const float FRES_MAX = 0.74;
+/** Peak Fresnel. See the file header, fault (1) — and the rewrite note: the
+ *  exponent drops 5 -> 4 so mid-angle water picks up real sky, not just the
+ *  last two degrees of grazing. */
+const float FRES_MAX = 0.86;
 
 vec3 skyDome(vec3 d) {
   float up = clamp(d.y, 0.0, 1.0);
@@ -413,8 +422,8 @@ void main() {
   vec2 slope = vWaveD.yz;
   float lace = 0.5;
   if (detailFade > 0.002) {
-    vec3 fine = waveSet(vWorld.xz * 3.7 + vec2(11.3, -4.1), uTime * 1.9, 0.085 * detailFade * mix(0.35, 1.0, vShore.r), uChop);
-    vec3 micro = waveSet(vWorld.xz * 11.0 + vec2(-30.0, 7.0), uTime * 3.1, 0.018 * detailFade, uChop);
+    vec3 fine = waveSet(vWorld.xz * 3.7 + vec2(11.3, -4.1), uTime * 1.9, 0.115 * detailFade * mix(0.35, 1.0, vShore.r), uChop);
+    vec3 micro = waveSet(vWorld.xz * 11.0 + vec2(-30.0, 7.0), uTime * 3.1, 0.026 * detailFade, uChop);
     slope += fine.yz + micro.yz;
     lace = clamp(fine.x * 26.0 + micro.x * 40.0, -1.0, 1.0) * 0.5 + 0.5;
   }
@@ -439,10 +448,11 @@ void main() {
   // pure mirror; pictorially that throws away the entire #3fc9c4 -> #0d5a7a
   // depth ramp the bible asks for, because from a kart 3 m off the deck almost
   // all of the visible water IS at grazing. See the file header, fault (1).
-  float fres = 0.02 + FRES_MAX * pow(1.0 - ndv, 5.0);
-  // Shallow water is body-dominant — that is *why* a lagoon is turquoise — so
-  // the shelf gives up a third of its reflectivity to keep its colour.
-  fres *= mix(0.62, 1.0, vShore.r);
+  float fres = 0.03 + FRES_MAX * pow(1.0 - ndv, 4.0);
+  // Shallow water stays body-dominant — that is *why* a lagoon is turquoise —
+  // but it only gives up a fifth of its mirror now: the dusk must be able to
+  // lie on the shelf too, or the shallows read as paint.
+  fres *= mix(0.80, 1.0, vShore.r);
 
   vec3 R = reflect(-V, N);
   R.y = max(R.y, 0.008);                       // never sample under the sea
@@ -460,12 +470,15 @@ void main() {
   vec3 body = mix(SHALLOW, DEEP, depth01 * depth01);
   float upwell = clamp(dot(N, uSunDir) * 0.5 + 0.5, 0.0, 1.0);
   float crest = clamp(vWaveD.x * 1.6 + sw.x * 0.9 + 0.35, 0.0, 1.0);
-  body *= 0.55 + 0.85 * upwell;
-  body += SHALLOW * uSunCol * (1.0 - depth01) * 0.30 * crest;   // sun through the shallows
+  body *= 0.50 + 0.80 * upwell;
+  body += SHALLOW * uSunCol * (1.0 - depth01) * 0.34 * crest;   // sun through the shallows
+  // The dusk lies ON the water body, not only in the mirror term: a violet-pink
+  // ambient kiss, stronger where the water is deep (the shelf keeps its teal).
+  body += mix(HZ_ANTI, HORIZON, 0.42) * (0.05 + 0.09 * depth01);
   // Swell shading. The long components darken their own troughs and lift their
   // crests; at 118 m and 46 m this is a broad, slow corduroy that reads as a
   // moving surface at any range and cannot alias at any of them.
-  body *= 1.0 + clamp(sw.x, -1.0, 1.0) * 0.26;
+  body *= 1.0 + clamp(sw.x, -1.0, 1.0) * 0.36;
 
   // --- specular: a tight lobe scaled to a KNOWN peak. A physical GGX D term
   // peaks in the hundreds of thousands at water roughness and would detonate
@@ -511,7 +524,11 @@ void main() {
   float cliffFoam = vShore.b;
   // the shoreline band surges with the swell instead of sitting still
   float surge = sin(vWorld.x * 0.22 + vWorld.z * 0.19 - uTime * 1.35) * 0.5 + 0.5;
-  float foam = shoreFoam * smoothstep(0.12, 0.82, surge * 0.55 + lace * 0.65);
+  // Two bands, not one. A constant base band is the SURF LINE — the white edge
+  // every coastal reference has and the review kept asking for — and the lace
+  // modulation rides on top of it instead of gating it to nothing.
+  float foam = shoreFoam * (0.38 + 0.62 * smoothstep(0.12, 0.82, surge * 0.55 + lace * 0.65));
+  foam += smoothstep(0.72, 0.96, shoreFoam) * 0.6;
   foam += cliffFoam * (0.45 + 0.55 * abs(sin(vWorld.x * 0.35 + uTime * 1.9))) * lace;
   // whitecaps on the steepest crests of the near field
   float steep = length(vWaveD.yz);

@@ -668,14 +668,14 @@ export class Scenery implements System {
       // metres above the water and shelves for a long way; the cliff traverse
       // stands 40 m up and the bottom is gone within fifteen.
       const steep = smoothstep(10, 38, shoreY[c]);
-      const shelf = lerp(82, 19, steep);
+      const shelf = lerp(112, 22, steep);
       const depth = smoothstep(2.5, shelf, d);
       // The surf band is now centred on the WATERLINE, because `d` is measured
       // from it: 24 m of broken water shelving off a beach, 12 m of hard white
       // spray at the foot of a cliff. Wide enough to survive being read at
       // 300 m, which is where most of the coastline in a chase frame sits.
-      const shoreFoam = (1 - smoothstep(2, 24, d)) * (1 - steep);
-      const cliffFoam = (1 - smoothstep(1, 12, d)) * steep;
+      const shoreFoam = (1 - smoothstep(2, 44, d)) * (1 - steep);
+      const cliffFoam = (1 - smoothstep(1, 18, d)) * steep;
       const o = c * 4;
       data[o] = clamp(depth, 0, 1) * 255;
       data[o + 1] = clamp(shoreFoam, 0, 1) * 255;
