@@ -79,6 +79,13 @@ export interface SeaField {
 }
 
 const _v2 = new THREE.Vector3();
+const _pd = new THREE.Vector3();
+const _pt = new THREE.Vector3();
+const _pu = new THREE.Vector3();
+const _planeN = new THREE.Vector3(0, 1, 0);
+const _plane = new THREE.Plane();
+const _clip = new THREE.Vector4();
+const _q4 = new THREE.Vector4();
 
 export class Water {
   readonly group = new THREE.Group();
@@ -87,6 +94,10 @@ export class Water {
   private fieldTex!: THREE.DataTexture;
   private level = 0;
   private envTried = false;
+  // --- planar reflection pass (settings.reflections tiers only) ------------
+  private planarRT: THREE.WebGLRenderTarget | null = null;
+  private mirrorCam = new THREE.PerspectiveCamera();
+  private texMat = new THREE.Matrix4();
 
   constructor(private u: Shared) {
     this.group.name = 'sea';
@@ -115,6 +126,28 @@ export class Water {
     uniforms.uEnv = { value: null };
     uniforms.uEnvIntensity = { value: 0 };
     uniforms.uChop = { value: ctx.settings.quality >= 1 ? 1 : 0.6 };
+    uniforms.uPlanar = { value: null };
+    uniforms.uPlanarMat = { value: this.texMat };
+    uniforms.uPlanarW = { value: 0 };
+
+    const defines: Record<string, string> = { ENV_NONE: '' };
+    // Planar reflections of the actual scene -- karts, palms, buildings -- in
+    // the water. High/Ultra only: it is a second (quarter-res, short-far)
+    // render of the world every frame.
+    if (ctx.settings.reflections) {
+      const rw = Math.max(320, Math.round(ctx.width / 4));
+      const rh = Math.max(180, Math.round(ctx.height / 4));
+      this.planarRT = new THREE.WebGLRenderTarget(rw, rh, {
+        // Half float so the superwhite sky and sun collar survive into the
+        // reflection instead of clamping at 1.0 and reading dimmer than the
+        // analytic dome they blend with.
+        type: THREE.HalfFloatType,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+      });
+      uniforms.uPlanar.value = this.planarRT.texture;
+      defines.PLANAR = '';
+    }
 
     this.mat = new THREE.ShaderMaterial({
       uniforms,
@@ -122,7 +155,7 @@ export class Water {
       fragmentShader: FRAG,
       fog: true,
       side: THREE.FrontSide,
-      defines: { ENV_NONE: '' },
+      defines,
     });
 
     this.mesh = new THREE.Mesh(geo, this.mat);
@@ -179,6 +212,81 @@ export class Water {
       (this.mat.uniforms.uSunCol.value as THREE.Color).setRGB(_v2.x, _v2.y, _v2.z).multiplyScalar(1.35 + Math.min(ctx.sun.intensity, 6) * 0.12);
     }
     if (!this.envTried && ctx.envMap) this.adoptEnv(ctx.envMap);
+    if (this.planarRT) this.renderPlanar(ctx);
+  }
+
+  /**
+   * Render the world from a camera mirrored across the sea plane into the
+   * planar target. Runs during the update phase, so it lands before the main
+   * present; the chase camera's pose is one frame stale, which at 60 Hz is
+   * beneath notice. Tone mapping is switched off for the pass (the water
+   * shader tonemaps once, at the end, like every other fragment), shadow-map
+   * updates are frozen so the cascades render once per frame in the main
+   * pass, and an oblique near plane clips everything below the waterline --
+   * the Reflector technique, which works for every material including raw
+   * ShaderMaterials that ignore clipping planes.
+   */
+  private renderPlanar(ctx: Ctx) {
+    const r = ctx.renderer;
+    const cam = ctx.camera;
+    const L = this.level;
+    const cm = this.mirrorCam;
+
+    // Skip when the camera is below the plane (never in normal play).
+    if (cam.position.y <= L + 0.05) {
+      (this.mat.uniforms.uPlanarW as { value: number }).value = 0;
+      return;
+    }
+
+    cm.fov = cam.fov; cm.aspect = cam.aspect;
+    cm.near = cam.near; cm.far = Math.min(700, cam.far);
+    cm.position.set(cam.position.x, 2 * L - cam.position.y, cam.position.z);
+    cam.getWorldDirection(_pd);
+    _pt.set(cam.position.x + _pd.x, 2 * L - (cam.position.y + _pd.y), cam.position.z + _pd.z);
+    _pu.copy(cam.up).applyQuaternion(cam.quaternion);
+    cm.up.set(_pu.x, -_pu.y, _pu.z);
+    cm.lookAt(_pt);
+    cm.updateProjectionMatrix();
+    cm.updateMatrixWorld(true);
+
+    // Projective sampling matrix for the shader: NDC -> [0,1].
+    this.texMat.set(
+      0.5, 0, 0, 0.5,
+      0, 0.5, 0, 0.5,
+      0, 0, 0.5, 0.5,
+      0, 0, 0, 1,
+    ).multiply(cm.projectionMatrix).multiply(cm.matrixWorldInverse);
+
+    // Oblique near-plane: fold the water plane into the projection so nothing
+    // below the surface leaks into the mirror (standard Lengyel construction).
+    _plane.set(_planeN, -L);
+    _plane.applyMatrix4(cm.matrixWorldInverse);
+    _clip.set(_plane.normal.x, _plane.normal.y, _plane.normal.z, _plane.constant);
+    const proj = cm.projectionMatrix;
+    _q4.x = (Math.sign(_clip.x) + proj.elements[8]) / proj.elements[0];
+    _q4.y = (Math.sign(_clip.y) + proj.elements[9]) / proj.elements[5];
+    _q4.z = -1.0;
+    _q4.w = (1.0 + proj.elements[10]) / proj.elements[14];
+    _clip.multiplyScalar(2.0 / _clip.dot(_q4));
+    proj.elements[2] = _clip.x;
+    proj.elements[6] = _clip.y;
+    proj.elements[10] = _clip.z + 1.0;
+    proj.elements[14] = _clip.w;
+
+    const oldTM = r.toneMapping;
+    const oldShadow = r.shadowMap.autoUpdate;
+    const oldTarget = r.getRenderTarget();
+    this.mesh.visible = false;
+    r.toneMapping = THREE.NoToneMapping;
+    r.shadowMap.autoUpdate = false;
+    r.setRenderTarget(this.planarRT);
+    r.clear();
+    r.render(ctx.scene, cm);
+    r.setRenderTarget(oldTarget);
+    r.toneMapping = oldTM;
+    r.shadowMap.autoUpdate = oldShadow;
+    this.mesh.visible = true;
+    (this.mat.uniforms.uPlanarW as { value: number }).value = 1;
   }
 
   /**
@@ -204,6 +312,7 @@ export class Water {
     this.mesh.geometry.dispose();
     this.mat.dispose();
     this.fieldTex.dispose();
+    this.planarRT?.dispose();
   }
 }
 
@@ -351,6 +460,11 @@ uniform vec3 uSunDir;
 uniform vec3 uSunCol;
 uniform float uChop;
 uniform float uEnvIntensity;
+#ifdef PLANAR
+uniform sampler2D uPlanar;
+uniform mat4 uPlanarMat;
+uniform float uPlanarW;
+#endif
 uniform sampler2D uField;
 uniform vec2 uFieldOrigin;
 uniform float uFieldSize;
@@ -500,6 +614,22 @@ void main() {
   vec3 R = reflect(-V, N);
   R.y = max(R.y, 0.008);                       // never sample under the sea
   vec3 refl = envSample(R);
+  #ifdef PLANAR
+  // The mirrored scene: karts, palms, parasols, buildings -- sampled
+  // projectively and pushed around by the wave normal so the reflection
+  // wobbles with the surface. The distortion shrinks with distance or the
+  // far shore would smear; the analytic dome stays underneath for the last
+  // metres before the target edge and for everything past its far plane.
+  vec4 pp = uPlanarMat * vec4(vWorld, 1.0);
+  if (pp.w > 0.0) {
+    vec2 puv = pp.xy / pp.w;
+    puv += N.xz * (10.0 / max(pp.w, 8.0));
+    vec2 pm = abs(puv - 0.5);
+    float pvalid = uPlanarW * (1.0 - smoothstep(0.40, 0.50, max(pm.x, pm.y)));
+    vec3 planar = texture2D(uPlanar, clamp(puv, 0.001, 0.999)).rgb;
+    refl = mix(refl, planar, pvalid * 0.9);
+  }
+  #endif
 
   // --- body colour: depth ramp plus a warm upwelling on the sun-facing faces
   // The baked field is a true distance-to-shore transform (see
