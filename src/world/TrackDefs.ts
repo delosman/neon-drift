@@ -465,9 +465,140 @@ const SUMMIT_SPRINT: TrackDef = {
 };
 
 // ===========================================================================
+//  VAPOR CANYON — the fork's own design: over, under, and along the gorge
+//
+//  The only circuit that uses BOTH signature structures. Start high on the
+//  mesa rim, dive through a DESCENDING tunnel bored into the canyon wall,
+//  run flat-out along the river inlet at the bottom, climb the far face into
+//  a banked carousel cut into the rock, then cross back over the whole
+//  canyon on the bridge at 32 m before the drop to the line. Leg turns
+//  min-norm Newton-solved (residual 8 mm) like every other circuit.
+// ===========================================================================
+const VAPOR_CANYON: TrackDef = {
+  id: 'vapor-canyon',
+  name: 'Vapor Canyon',
+  dressLabel: 'carving the canyon',
+  kit: 'gridline',
+  laps: 3,
+  legs: [
+    [300, -4.13],   // 0.000 mesa straight, high on the rim
+    [90, -78.87],   // 0.171 T1 sweeping left into the canyon wall
+    [110, -17.31],  // 0.223 TUNNEL DIVE — descending bore through the rock
+    [130, -74.96],  // 0.286 canyon hook left, still descending
+    [280, 6.79],    // 0.360 river flat-out along the inlet
+    [80, 72.98],    // 0.520 T3 right onto the climb
+    [120, -44.48],  // 0.566 climbing sweeper
+    [90, -115.24],  // 0.634 wall carousel — banked, cut into the face
+    [100, -22.13],  // 0.686 rim approach
+    [90, 16.37],    // 0.743 BRIDGE back across the canyon
+    [190, -48.72],  // 0.794 rim return sweeper
+    [170, -50.50],  // 0.903 final drop to the line
+  ],
+  startHeading: 45,
+  elevation: [
+    [0.000, 30.0], [0.060, 30.5], [0.140, 29.0], [0.190, 26.5],
+    [0.226, 24.0], [0.260, 18.0], [0.288, 14.0], [0.340, 8.0],
+    [0.420, 4.0], [0.500, 3.2], [0.550, 6.0], [0.600, 12.0],
+    [0.634, 18.0], [0.686, 26.0], [0.720, 30.0], [0.746, 32.0],
+    [0.770, 32.5], [0.794, 32.0], [0.850, 31.0], [0.920, 30.3],
+    [0.970, 30.0],
+  ],
+  halfWidth: [
+    [0.000, 8.8],
+    [0.080, 8.4],
+    [0.171, 7.4],
+    [0.200, 6.6],
+    [0.226, 6.0],
+    [0.260, 6.0],
+    [0.288, 6.6],
+    [0.320, 7.0],
+    [0.360, 7.6],
+    [0.440, 8.2],
+    [0.500, 8.0],
+    [0.550, 7.4],
+    [0.600, 6.8],
+    [0.634, 8.4],
+    [0.686, 8.2],
+    [0.720, 7.2],
+    [0.746, 7.0],
+    [0.790, 7.0],
+    [0.800, 7.6],
+    [0.860, 7.8],
+    [0.930, 8.2],
+    [0.970, 8.6],
+  ],
+  bank: [
+    [0.000, 0], [0.100, 6], [0.190, 8], [0.240, 4], [0.300, 8],
+    [0.340, 4], [0.400, 2], [0.470, 3],
+    [0.520, -4],
+    [0.560, -2], [0.600, 6],
+    [0.640, 14], [0.660, 20], [0.685, 18],
+    [0.710, 6], [0.746, -3], [0.770, -2], [0.794, 2],
+    [0.850, 8], [0.900, 4], [0.960, 0],
+  ],
+  zones: [
+    { t0: 0.000, fade: 0.016, name: 'mesa',
+      nearL: [0, -0.4, 1.6], farL: 26, farDL: 120, rockL: 0.2, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.3, -1.2, -2.6], farR: 24, farDR: 120, rockR: 0.3, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
+      cobble: 0, kerb: 1 },
+    { t0: 0.171, fade: 0.014, name: 'wall',
+      nearL: [0, 1.6, 12], farL: 60, farDL: 90, rockL: 0.9, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -8, -24], farR: 4, farDR: 55, rockR: 0.85, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.223, fade: 0.013, name: 'tunnel',
+      nearL: [0, 2.6, 15], farL: 58, farDL: 90, rockL: 1, shoulderL: 3, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: TUNNEL_CLEAR - 0.15,
+      nearR: [0, 1.0, 10], farR: 54, farDR: 90, rockR: 1, shoulderR: 3, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: TUNNEL_CLEAR - 0.15,
+      cobble: 0, kerb: 1 },
+    { t0: 0.288, fade: 0.016, name: 'canyon',
+      nearL: [0, 1.6, 13], farL: 58, farDL: 85, rockL: 0.95, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -7, -22], farR: 3, farDR: 45, rockR: 0.85, shoulderR: 1.8, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.355, fade: 0.020, name: 'river',
+      nearL: [0, 1.2, 10], farL: 32, farDL: 80, rockL: 0.6, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 70, rockR: 0.1, shoulderR: 11, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
+      cobble: 0, kerb: 1 },
+    { t0: 0.515, fade: 0.016, name: 'climb',
+      nearL: [-1.2, -8, -24], farL: 2, farDL: 50, rockL: 0.85, shoulderL: 1.5, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
+      nearR: [0, 1.6, 12], farR: 56, farDR: 90, rockR: 0.9, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.630, fade: 0.014, name: 'carousel',
+      nearL: [-1.0, -5, -16], farL: 3, farDL: 60, rockL: 0.7, shoulderL: 8, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
+      nearR: [0, 2.0, 14], farR: 62, farDR: 85, rockR: 0.95, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.700, fade: 0.012, name: 'rim',
+      nearL: [-0.8, -4, -12], farL: 4, farDL: 70, rockL: 0.6, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
+      nearR: [0, -0.4, 1.5], farR: 26, farDR: 100, rockR: 0.35, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_NONE, wallOffR: 0,
+      cobble: 0, kerb: 1 },
+    { t0: 0.743, fade: 0.006, name: 'bridge',
+      nearL: [-1.5, -9, -20], farL: 2, farDL: 46, rockL: 0.8, shoulderL: 0.6, surfL: Surface.Dirt, wallL: WALL_PARAPET, wallOffL: PARAPET_FACE,
+      nearR: [-1.5, -9, -20], farR: 2, farDR: 46, rockR: 0.8, shoulderR: 0.6, surfR: Surface.Dirt, wallR: WALL_PARAPET, wallOffR: PARAPET_FACE,
+      cobble: 0.55, kerb: 0 },
+    { t0: 0.794, fade: 0.010, name: 'rimreturn',
+      nearL: [0, -0.5, 1.6], farL: 24, farDL: 110, rockL: 0.3, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
+      nearR: [-0.4, -1.6, -3.4], farR: 26, farDR: 110, rockR: 0.35, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.2,
+      cobble: 0, kerb: 1 },
+    { t0: 0.930, fade: 0.008, name: 'return',
+      nearL: [0, -0.4, 1.4], farL: 26, farDL: 120, rockL: 0.2, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.4, -1.8, -4.0], farR: 25, farDR: 100, rockR: 0.25, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.4,
+      cobble: 0, kerb: 1 },
+  ],
+  tunnel: [0.226, 0.283],
+  bridge: [0.746, 0.791],
+  boostPads: [
+    { t0: 0.4150, t1: 0.4320, lat: -2.9, hw: 1.9 },
+    { t0: 0.4150, t1: 0.4320, lat: 2.9, hw: 1.9 },
+    { t0: 0.8300, t1: 0.8470, lat: 0.0, hw: 2.6 },
+    { t0: 0.9450, t1: 0.9620, lat: -3.0, hw: 2.0 },
+    { t0: 0.9450, t1: 0.9620, lat: 3.0, hw: 2.0 },
+  ],
+  boxRows: [0.050, 0.145, 0.250, 0.330, 0.420, 0.500, 0.590, 0.670, 0.810, 0.885],
+  hoardingZones: [[0, 0.09], [0.60, 0.74]],
+};
+
+// ===========================================================================
 //  Registry + active-track resolution
 // ===========================================================================
-export const TRACKS: TrackDef[] = [SUNSET_BAY, NEON_HORIZON, SUMMIT_SPRINT];
+export const TRACKS: TrackDef[] = [SUNSET_BAY, NEON_HORIZON, SUMMIT_SPRINT, VAPOR_CANYON];
 
 export const TRACK_STORAGE_KEY = 'kr.track';
 

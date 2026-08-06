@@ -22,6 +22,7 @@ const TRACK_TAGLINES: Record<string, string> = {
   'sunset-bay': '3 laps — harbour, village esses, cliff tunnel, banked 180',
   'neon-horizon': '3 laps — shore straight, ridge climb, banked carousel',
   'summit-sprint': 'Sprint — one flying run over the mountain, hairpins and a summit tunnel',
+  'vapor-canyon': '3 laps — tunnel dive, river flat-out, wall carousel, canyon bridge',
 };
 
 /** card accent per circuit */
@@ -29,6 +30,7 @@ const TRACK_ACCENTS: Record<string, string> = {
   'sunset-bay': '#ffcf6b',
   'neon-horizon': '#ff2d95',
   'summit-sprint': '#4fe8ff',
+  'vapor-canyon': '#b44fff',
 };
 
 /**
