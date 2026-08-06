@@ -480,9 +480,9 @@ export class AtmosphereModel {
   readonly hazePoly: THREE.Vector3[] = [];
 
   /** How bright the disc core is. High on purpose: it must clip and bloom. */
-  sunDiscIntensity = 42;
+  sunDiscIntensity = 52;
   /** Angular radius of the disc, radians. ~3x life size, Nintendo rules. */
-  sunAngularRadius = 0.019;
+  sunAngularRadius = 0.030;
 
   private readonly mieTint = new THREE.Vector3(MIE_TINT[0], MIE_TINT[1], MIE_TINT[2]);
   /** Horizon direction used as the calibration probe: 90° in azimuth from the sun. */
@@ -721,7 +721,7 @@ export class AtmosphereModel {
     // frame after the disc, but unmistakably warm. The thin backlit rims still
     // clip, because the forward Mie lobe multiplies this by up to 2.2.
     const warm = new THREE.Color(SUN_LIGHT_COLOR);
-    this.cloudSunColor.set(warm.r, warm.g, warm.b).multiplyScalar(1.7);
+    this.cloudSunColor.set(warm.r, warm.g, warm.b).multiplyScalar(2.15);
     // SHADED CLOUD, and this is the fix for the grey-brown smear that sat
     // behind the subject in the round-1 closeup and grid frames.
     //

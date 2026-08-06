@@ -88,6 +88,9 @@ const SHOTS = [
   { name: 'wide',        t: 0.30, speed: 18, cam: 'wide', desc: 'High wide establishing shot of the circuit' },
   { name: 'closeup',     t: 0.50, speed: 14, cam: 'close', desc: 'Close on the kart — model and material detail' },
   { name: 'hud',         t: 0.14, speed: 28, desc: 'Gameplay frame judged for HUD composition' },
+  { name: 'sunward',     t: 0.45, speed: 22, desc: 'Cliff traverse driving into the low sun' },
+  { name: 'pad',         t: 0.945, speed: 16, desc: 'Approaching the finish-straight boost pads' },
+  { name: 'harbour',     t: 0.685, speed: 20, desc: 'Beach descent — open sea fills the right of frame' },
 ];
 
 /** seconds of pinned running after the mark is reached, before the shutter */

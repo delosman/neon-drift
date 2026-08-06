@@ -1053,10 +1053,10 @@ export class Scenery implements System {
       this.claim(_p2, 8.5);
     }
     for (const row of gs.seats) {
-      const perRow = 42;
+      const perRow = 64;
       for (let i = 0; i < perRow; i++) {
         // gaps and knots, not a solid confetti block
-        if (rng() < 0.16 + Math.abs(Math.sin(i * 0.7 + row.y)) * 0.18) continue;
+        if (rng() < 0.09 + Math.abs(Math.sin(i * 0.7 + row.y)) * 0.12) continue;
         const x = -27 + (i / (perRow - 1)) * 54 + (rng() - 0.5) * 0.7;
         const local = trs(x, row.y, row.z + 0.16, Math.PI + (rng() - 0.5) * 0.6, 0.84 + rng() * 0.36);
         this.spectator(_m4.multiplyMatrices(gm, local).clone(), rng);

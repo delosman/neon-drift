@@ -2141,7 +2141,7 @@ export class Materials implements System {
     // the voids between the chippings, so the binder goes much darker while the
     // stone crowns standing proud of the film stay close to dry. That contrast
     // *inversion* is what makes a wet road read as wet rather than as painted.
-    const binder = rgb(wet ? 0x2e2e44 : racingLine ? 0x3b3b58 : 0x42425e);
+    const binder = rgb(wet ? 0x2e2e44 : racingLine ? 0x30304c : 0x42425e);
     // Chippings are a VALUE break in the binder, not a hue break. A warm grey
     // this far from the binder's cool violet survives the golden-hour key and
     // the 1.12 saturation lift as orange confetti sprinkled on lavender, which

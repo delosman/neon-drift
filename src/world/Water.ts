@@ -365,7 +365,7 @@ const vec3 FOAM    = vec3(0.8228, 0.9734, 1.0000);   // #eafcff
 const vec3 HZ_ANTI = vec3(0.1520, 0.1180, 0.3400);   // counter-glow, dusk violet
 
 /** Peak Fresnel. See the file header, fault (1). */
-const float FRES_MAX = 0.60;
+const float FRES_MAX = 0.74;
 
 vec3 skyDome(vec3 d) {
   float up = clamp(d.y, 0.0, 1.0);
@@ -503,7 +503,7 @@ void main() {
   float sparkle = pow(ndh, 220.0) * step(0.86, sp) * 8.0 * detailFade * (0.25 + 0.75 * track);
   // a coarser, slower facet field that survives out to the horizon
   float spF = hash21(floor(vWorld.xz * 0.55 + vec2(uTime * 0.11, -uTime * 0.07)));
-  float glint = pow(ndh, mix(240.0, 70.0, flatten01)) * step(0.82, spF) * 3.6 * flatten01 * (0.12 + 0.88 * track);
+  float glint = pow(ndh, mix(240.0, 70.0, flatten01)) * step(0.78, spF) * 5.4 * flatten01 * (0.12 + 0.88 * track);
   vec3 sun = uSunCol * (tight + broad + sparkle + glint);
 
   // --- foam

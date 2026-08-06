@@ -106,9 +106,9 @@ interface TierFx {
 }
 const TIER_FX: TierFx[] = [
   { rate: 0,   core: 0,    halo: 0,    poolS: 0,    poolI: 0,    jet: 0,   pulse: 0,  spark: 0,    flash: 0 },
-  { rate: 64,  core: 0.20, halo: 0.70, poolS: 1.00, poolI: 0.88, jet: 0,   pulse: 0,  spark: 2.25, flash: 0.20 },
-  { rate: 100, core: 0.28, halo: 0.96, poolS: 1.45, poolI: 1.34, jet: 0.7, pulse: 0,  spark: 2.55, flash: 0.26 },
-  { rate: 140, core: 0.36, halo: 1.22, poolS: 2.00, poolI: 1.92, jet: 1.0, pulse: 1,  spark: 2.85, flash: 0.34 },
+  { rate: 92,  core: 0.30, halo: 0.82, poolS: 1.00, poolI: 0.88, jet: 0,   pulse: 0,  spark: 2.45, flash: 0.20 },
+  { rate: 145, core: 0.42, halo: 1.12, poolS: 1.45, poolI: 1.34, jet: 0.7, pulse: 0,  spark: 2.85, flash: 0.26 },
+  { rate: 200, core: 0.54, halo: 1.42, poolS: 2.00, poolI: 1.92, jet: 1.0, pulse: 1,  spark: 3.20, flash: 0.34 },
 ];
 /** beats per second of the tier-3 ground pulse */
 const TIER3_PULSE_HZ = 6.5;

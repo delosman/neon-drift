@@ -67,7 +67,7 @@ const C_PAINT = new THREE.Color('#e6f8ff');
  * because the polished core also gets the darker `tarmac-racing-line` map on top
  * of this, and the two must not stack into a black stripe.
  */
-const C_RACE_MUL = new THREE.Color(0.75, 0.75, 0.90);
+const C_RACE_MUL = new THREE.Color(0.60, 0.60, 0.80);
 /** violet dusting where the beach blows sand across the outer lane */
 const C_SAND_MUL = new THREE.Color(1.22, 1.08, 1.24);
 /** pale silt and grit washed into the gutter, in patches, everywhere */

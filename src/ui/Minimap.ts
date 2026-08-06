@@ -66,8 +66,8 @@ const CASE_COL = '#0e0803';
  * taken two stops down, inside a warm plate. Read as the bay from above, not
  * as a product-UI panel — which is exactly the distinction the review drew.
  */
-const WELL_A = '#0f4257';
-const WELL_B = '#06202e';
+const WELL_A = '#2b2150';
+const WELL_B = '#120c28';
 
 /**
  * SECTION TINT — ART_DIRECTION §1's lap table, as value.
@@ -315,7 +315,7 @@ export class Minimap {
     g.moveTo(ax - nx, ay - ny);
     g.lineTo(ax + nx, ay + ny);
     g.lineWidth = 8.5 * d;
-    g.strokeStyle = 'rgba(255, 200, 108, 0.9)';
+    g.strokeStyle = 'rgba(244, 242, 255, 0.9)';
     g.stroke();
     g.restore();
 

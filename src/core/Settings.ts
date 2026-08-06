@@ -673,6 +673,17 @@ export function createSettings(): Settings {
   const scale = parseFloat(params.get('scale') || '');
   if (Number.isFinite(scale) && scale > 0) s.renderScale = scale;
 
+  // `?no=volumetrics,dof` — harness-only: clear individual feature flags on
+  // top of the chosen tier. Exists to bisect capture-environment faults (one
+  // high-tier pass blows out under some headless GL stacks) without dropping
+  // the whole tier for a screenshot.
+  for (const key of (params.get('no') || '').split(',')) {
+    if (key === 'shadows' || key === 'ssao' || key === 'bloom' || key === 'motionBlur' ||
+        key === 'dof' || key === 'volumetrics' || key === 'reflections') {
+      (s as any)[key] = false;
+    }
+  }
+
   // ---- pixel-count ceiling ------------------------------------------------
   // See PIXEL_BUDGET_MPX. Applied against the ratio the renderer will actually
   // allocate at, which is `min(dpr, maxPixelRatio) * renderScale` — so the
