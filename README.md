@@ -16,7 +16,7 @@ race under a permanent neon dusk: indigo overhead falling to a hot pink
 horizon, magenta kerbs against ice cyan, teal water, and a chase camera
 pointed straight down the sun's collar.
 
-Four events:
+Five events:
 
 | Event | Format | Character |
 |---|---|---|
@@ -24,6 +24,7 @@ Four events:
 | **Neon Horizon GP** | 3 laps · 1.4 km | Open-sky flow: shore straight at sea level, a ridge climb, a high banked carousel over the water, an off-camber chicane |
 | **Summit Sprint** | Sprint · 2.2 km | One flying run over the mountain — hairpin switchbacks, a tunnel bored through the summit at 54 m, then a plunge back to a seafront drag |
 | **Vapor Canyon** | 3 laps · 1.75 km | Over, under and along the gorge: a descending tunnel dive, a river flat-out, a banked carousel cut into the wall, and a bridge back across the canyon |
+| **Negative Zone** | 3 laps · 1.65 km | Black and white, all edges: five sawtooth teeth, a flat-out blade, and a closing hairpin bolt — the world develops to monochrome |
 
 ![The four circuits](docs/track-shapes.png)
 
@@ -43,7 +44,7 @@ npm run preview    # serve the production build
 ```
 
 Track select is in-game (title → circuit → racer), or force one with
-`?track=sunset-bay | neon-horizon | summit-sprint | vapor-canyon`.
+`?track=sunset-bay | neon-horizon | summit-sprint | vapor-canyon | negative-zone`.
 
 Publishing to VIVERSE: see [PUBLISH-VIVERSE.md](PUBLISH-VIVERSE.md).
 

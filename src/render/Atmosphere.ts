@@ -25,6 +25,7 @@
  * ============================================================================
  */
 import * as THREE from 'three';
+import { ACTIVE_TRACK } from '../world/TrackDefs';
 import { createNoise4D } from 'simplex-noise';
 
 // --- art bible constants -----------------------------------------------------
@@ -82,16 +83,19 @@ export const SUN_DIRECTION = (() => {
   // is untouched by construction
   return new THREE.Vector3(x * c - z * s, v.y, x * s + z * c).normalize();
 })();
+/** The negative theme flattens every light to achromatic. */
+const NEG = ACTIVE_TRACK.theme === 'negative';
 /**
  * Key light colour — synthwave restyle. The bible's golden-hour 0xffd9a8 moves
  * to a warm neon pink; still warm enough to read as a low sun, saturated
- * enough that every lit flank carries the magenta half of the split.
+ * enough that every lit flank carries the magenta half of the split. Under
+ * the negative theme the key is pure white — film lighting, not stage.
  */
-export const SUN_LIGHT_COLOR = 0xffb4c4;
+export const SUN_LIGHT_COLOR = NEG ? 0xffffff : 0xffb4c4;
 /** Ground bounce follows the sand/tarmac shift: dusty violet, not amber. */
-export const GROUND_BOUNCE_COLOR = 0x9a62b8;
+export const GROUND_BOUNCE_COLOR = NEG ? 0x9a9a9a : 0x9a62b8;
 /** Cool fill goes full cyan — the other half of the synthwave split. */
-export const SKY_FILL_COLOR = 0x7edcff;
+export const SKY_FILL_COLOR = NEG ? 0xc4c4c8 : 0x7edcff;
 /**
  * Direction TOWARD the cool fill: 35° up, on the ANTI-solar side.
  *
@@ -144,8 +148,8 @@ export const SKY_FILL_DIRECTION = new THREE.Vector3(
  * Rayleigh gains against these at boot, so the dome, the env map and the fog
  * all land on the new palette together.
  */
-export const SKY_ZENITH_TARGET = 0x4a54c8;
-export const SKY_HORIZON_TARGET = 0xffaec6;
+export const SKY_ZENITH_TARGET = NEG ? 0x121216 : 0x4a54c8;
+export const SKY_HORIZON_TARGET = NEG ? 0xf0f0f0 : 0xffaec6;
 
 // --- model constants ---------------------------------------------------------
 
@@ -186,7 +190,7 @@ const RAYLEIGH_BACKSCATTER = 0.40;
 /** Arbitrary radiometric scale; the calibration layer removes the ambiguity. */
 const SUN_ENERGY = 22;
 /** Aerosols run magenta — this is what gives the disc its neon collar. */
-const MIE_TINT = [1.0, 0.62, 0.78];
+const MIE_TINT = NEG ? [1.0, 1.0, 1.0] : [1.0, 0.62, 0.78];
 /**
  * Elevation (dir.y) at which the horizon gain has fully handed over to zenith.
  * 0.42 rather than 0.35: the warm band has to survive up to ~25° or the sky

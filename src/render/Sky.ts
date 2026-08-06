@@ -86,7 +86,7 @@ import {
   buildSkyFragmentShader,
   hazeGlsl,
 } from './Atmosphere';
-import { HAS_TUNNEL, TUNNEL_T0, TUNNEL_T1 } from '../world/TrackLayout';
+import { ACTIVE_TRACK, HAS_TUNNEL, TUNNEL_T0, TUNNEL_T1 } from '../world/TrackLayout';
 
 // --- tuning ------------------------------------------------------------------
 
@@ -456,8 +456,8 @@ const LATERAL_BOUNCE_SLOPE = -0.14;
  */
 const FLOOR_IRRADIANCE = 0.185;
 // Synthwave: the colour of every unlit pixel goes violet, matching the indigo
-// zenith the calibration now targets.
-const FLOOR_COLOR = 0x8272c8;
+// zenith the calibration now targets. The negative theme greys it out.
+const FLOOR_COLOR = ACTIVE_TRACK.theme === 'negative' ? 0x9a9aa0 : 0x8272c8;
 /**
  * The same floor inside an interior volume, warm sodium instead of teal. The
  * tunnel's premise is sodium strips; rock that falls off the bottom of the
@@ -473,8 +473,8 @@ const FLOOR_COLOR = 0x8272c8;
  */
 const INTERIOR_FLOOR_IRRADIANCE = 0.70;
 // The tunnel premise moves from sodium strips to neon: unlit bore rock reads
-// magenta-warm instead of amber.
-const INTERIOR_FLOOR_COLOR = 0xb64a92;
+// magenta-warm instead of amber — or bare fluorescent grey on the negative.
+const INTERIOR_FLOOR_COLOR = ACTIVE_TRACK.theme === 'negative' ? 0xc8c8c8 : 0xb64a92;
 /**
  * Warm penumbra band, art bible §2 ("long, soft, warm-tinted penumbra").
  * Added where the shadow test is partial, peaking at the half-shadow line and

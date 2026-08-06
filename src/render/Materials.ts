@@ -57,6 +57,7 @@
  * ============================================================================
  */
 import * as THREE from 'three';
+import { ACTIVE_TRACK } from '../world/TrackDefs';
 import { Quality, type Ctx, type System } from '../types';
 import {
   brickField,
@@ -2527,7 +2528,7 @@ export class Materials implements System {
       b: macroField(MACRO_RES, { freq: 3, octaves: 2, warp: 0.10, seed: 58, clip: 0.05 }),
     });
 
-    const red = rgb(0xff2d95);
+    const red = rgb(ACTIVE_TRACK.theme === 'negative' ? 0x141414 : 0xff2d95);
     const white = rgb(0xe6f8ff);
     const concreteC = rgb(0x9d9589);
     const rubberC = rgb(0x3a3a40);

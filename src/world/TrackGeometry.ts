@@ -23,6 +23,7 @@ import type { Ctx } from '../types';
 import { Surface } from '../types';
 import type { Track } from './Track';
 import {
+  ACTIVE_TRACK,
   BOOST_PADS, BRIDGE_T0, BRIDGE_T1, FASCIA_OFF, GRID_BOX_HL, GRID_BOX_HW,
   GRID_LAT, HAS_BRIDGE, HAS_TUNNEL, KERB_HS, KERB_QS, KERB_W, PARAPET_OFF, SEA_Y,
   SKIRT_W, TUNNEL_CLEAR, TUNNEL_H, TUNNEL_T0, TUNNEL_T1, WALL_GUARDRAIL,
@@ -42,7 +43,7 @@ import { registerPrewarm } from '../core/Prewarm';
 // was tuned against those luminances and rides on top of these.
 const C_TARMAC = new THREE.Color('#42425e');
 const C_RACE = new THREE.Color('#373752');
-const C_KERB_R = new THREE.Color('#ff2d95');
+const C_KERB_R = new THREE.Color(ACTIVE_TRACK.theme === 'negative' ? '#141414' : '#ff2d95');
 const C_KERB_W = new THREE.Color('#e6f8ff');
 const C_SAND = new THREE.Color('#d9b9de');
 const C_GRASS = new THREE.Color('#2f9c85');

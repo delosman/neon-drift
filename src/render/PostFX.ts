@@ -29,6 +29,7 @@
  * ============================================================================
  */
 import * as THREE from 'three';
+import { ACTIVE_TRACK } from '../world/TrackDefs';
 import {
   BloomEffect,
   BlendFunction,
@@ -723,9 +724,12 @@ export class GradeEffect extends Effect {
         // hair of headroom at the same time.
         // Synthwave split-tone: cyan shadows, magenta highlights. Same total
         // luminance discipline as the teal/amber pair it replaces — the tints
-        // rotate hue, they do not add energy.
-        ['coolTint', new THREE.Uniform(new THREE.Vector3(0.868, 1.005, 1.085))],
-        ['warmTint', new THREE.Uniform(new THREE.Vector3(1.105, 0.955, 1.045))],
+        // rotate hue, they do not add energy. The negative theme runs both
+        // neutral: a split-tone on a monochrome frame is just a colour cast.
+        ['coolTint', new THREE.Uniform(ACTIVE_TRACK.theme === 'negative'
+          ? new THREE.Vector3(1.0, 1.0, 1.0) : new THREE.Vector3(0.868, 1.005, 1.085))],
+        ['warmTint', new THREE.Uniform(ACTIVE_TRACK.theme === 'negative'
+          ? new THREE.Vector3(1.0, 1.0, 1.0) : new THREE.Vector3(1.105, 0.955, 1.045))],
         // Additive teal lift on the bottom of the curve — art bible §2 asks for
         // a #a8c8ff sky fill in the shadows, and nothing multiplicative can
         // produce it. Sized to sit just above the noise floor of an 8-bit write.
@@ -1267,11 +1271,12 @@ export class PostFX {
     const grade = new GradeEffect({
       samples,
       exposure: 1.05,
-      contrast: 0.18,
-      // A notch up for the neon palette — the split-tone rotates hue, this
-      // makes the rotated colour commit.
-      saturation: 1.22,
-      vignette: 0.24,
+      // The negative theme is THE grade: saturation zero develops the whole
+      // world to black and white in one knob, and the contrast comes up to
+      // make it graphic rather than merely grey.
+      contrast: ACTIVE_TRACK.theme === 'negative' ? 0.34 : 0.18,
+      saturation: ACTIVE_TRACK.theme === 'negative' ? 0.0 : 1.22,
+      vignette: ACTIVE_TRACK.theme === 'negative' ? 0.30 : 0.24,
       // Trimmed with the shadow rolloff added in the shader — the grain was
       // never the coloured speckle the review saw, but at 0.012 flat it was
       // still +/-1.8 counts of white noise sitting on top of the darkest eighth

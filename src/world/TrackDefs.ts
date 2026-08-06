@@ -81,6 +81,12 @@ export interface TrackDef {
   /** which set of bespoke scenery dressers runs — see Scenery.init */
   kit: 'coastal' | 'gridline';
   /**
+   * Optional per-circuit look. 'negative' develops the world to stark black
+   * and white: achromatic sky calibration, zero saturation in the grade,
+   * black-and-white kerb paint. Absent = the synthwave dusk.
+   */
+  theme?: 'negative';
+  /**
    * Race length in laps. 1 makes the event a SPRINT: one standing-start run
    * from the line back round to it, presented without a lap counter. The
    * engine's closed-loop invariants (cyclic centreline, checkpoints, AI line)
@@ -563,9 +569,101 @@ const VAPOR_CANYON: TrackDef = {
 };
 
 // ===========================================================================
+//  NEGATIVE ZONE — black and white, all edges, no comfort
+//
+//  The first themed circuit: `theme: 'negative'` develops the whole world to
+//  monochrome at boot (Atmosphere targets go achromatic, the grade's
+//  saturation drops to zero, the kerbs paint black-and-white). The silhouette
+//  matches the identity: a jagged BOLT — five sawtooth teeth up the east
+//  edge, a long fast blade, and a closing hairpin complex. Waypoint-designed,
+//  closure residual 5 mm.
+// ===========================================================================
+const NEGATIVE_ZONE: TrackDef = {
+  id: 'negative-zone',
+  name: 'Negative Zone',
+  dressLabel: 'developing the negative',
+  kit: 'gridline',
+  theme: 'negative',
+  laps: 3,
+  legs: [
+    [172, -46.71],   // v0  0.000 start straight, drifting left
+    [89, -100.76],   // v1  0.104 tooth 1 (left)
+    [69, 88.52],     // v2  0.158 tooth 2 (right)
+    [100, -102.64],  // v3  0.200 tooth 3 (left)
+    [69, 90.15],     // v4  0.260 tooth 4 (right)
+    [100, -96.84],   // v5  0.302 tooth 5 (left)
+    [97, -36.27],    // v6  0.363 the blade begins
+    [112, -29.77],   // v7  0.422 blade sweeper
+    [151, -28.52],   // v8  0.489 blade flat-out
+    [119, -31.22],   // v9  0.581 blade exit
+    [111, 52.62],    // v10 0.653 the notch (right)
+    [93, -64.67],    // v11 0.721 notch out (left)
+    [125, -46.74],   // v12 0.777 west sweep
+    [141, -154.00],  // v13 0.853 THE BOLT — closing hairpin left
+    [102, 157.05],   // v14 0.938 ...and its mirror right, onto the line
+  ],
+  startHeading: -2.6,
+  elevation: [
+    [0.000, 5.0], [0.100, 6.0], [0.160, 9.0], [0.200, 7.0],
+    [0.260, 10.0], [0.300, 8.0], [0.363, 12.0], [0.490, 16.0],
+    [0.581, 14.0], [0.653, 10.0], [0.721, 12.0], [0.777, 9.0],
+    [0.853, 7.0], [0.938, 5.5],
+  ],
+  halfWidth: [
+    [0.000, 8.8], [0.090, 8.0], [0.160, 7.2], [0.300, 7.2],
+    [0.363, 7.6], [0.490, 8.0], [0.653, 7.0], [0.721, 6.6],
+    [0.777, 7.2], [0.853, 7.6], [0.905, 6.8], [0.960, 8.2],
+  ],
+  bank: [
+    [0.000, 0],
+    [0.115, 10], [0.175, -10], [0.225, 10], [0.280, -10], [0.330, 8],
+    [0.400, 6], [0.490, 8], [0.600, 8],
+    [0.680, -8], [0.740, 8], [0.810, 6],
+    [0.880, 14], [0.925, 4], [0.955, -14], [0.990, -2],
+  ],
+  zones: [
+    { t0: 0.000, fade: 0.016, name: 'start',
+      nearL: [0, -0.4, 1.6], farL: 14, farDL: 110, rockL: 0.2, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.3, -1.2, -2.6], farR: 12, farDR: 110, rockR: 0.3, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
+      cobble: 0, kerb: 1 },
+    { t0: 0.095, fade: 0.012, name: 'teeth',
+      nearL: [0, -0.4, 1.8], farL: 18, farDL: 100, rockL: 0.45, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 2.9,
+      nearR: [-0.3, -1.2, -3.0], farR: 14, farDR: 100, rockR: 0.45, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+      cobble: 0, kerb: 1 },
+    { t0: 0.355, fade: 0.020, name: 'blade',
+      nearL: [0, -0.5, 1.6], farL: 22, farDL: 120, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
+      nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 80, rockR: 0.1, shoulderR: 11, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
+      cobble: 0, kerb: 1 },
+    { t0: 0.645, fade: 0.014, name: 'notch',
+      nearL: [0, -0.5, 1.8], farL: 16, farDL: 110, rockL: 0.35, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
+      nearR: [-0.3, -1.4, -3.6], farR: 12, farDR: 100, rockR: 0.35, shoulderR: 6, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 2.7,
+      cobble: 0, kerb: 1 },
+    { t0: 0.770, fade: 0.014, name: 'sweep',
+      nearL: [0, -0.4, 1.6], farL: 14, farDL: 110, rockL: 0.25, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
+      nearR: [-0.4, -1.6, -3.4], farR: 10, farDR: 100, rockR: 0.3, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.2,
+      cobble: 0, kerb: 1 },
+    { t0: 0.845, fade: 0.012, name: 'bolt',
+      nearL: [0, -0.4, 1.6], farL: 12, farDL: 100, rockL: 0.3, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
+      nearR: [-0.3, -1.2, -3.0], farR: 10, farDR: 100, rockR: 0.3, shoulderR: 6, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 2.7,
+      cobble: 0, kerb: 1 },
+  ],
+  tunnel: null,
+  bridge: null,
+  boostPads: [
+    { t0: 0.0400, t1: 0.0570, lat: -3.0, hw: 2.0 },
+    { t0: 0.0400, t1: 0.0570, lat: 3.0, hw: 2.0 },
+    { t0: 0.5200, t1: 0.5370, lat: -2.9, hw: 1.9 },
+    { t0: 0.5200, t1: 0.5370, lat: 2.9, hw: 1.9 },
+    { t0: 0.8000, t1: 0.8170, lat: 0.0, hw: 2.6 },
+  ],
+  boxRows: [0.070, 0.140, 0.220, 0.310, 0.400, 0.470, 0.560, 0.630, 0.740, 0.890],
+  hoardingZones: [[0, 0.09], [0.42, 0.60]],
+};
+
+// ===========================================================================
 //  Registry + active-track resolution
 // ===========================================================================
-export const TRACKS: TrackDef[] = [SUNSET_BAY, NEON_HORIZON, SUMMIT_SPRINT, VAPOR_CANYON];
+export const TRACKS: TrackDef[] = [SUNSET_BAY, NEON_HORIZON, SUMMIT_SPRINT, VAPOR_CANYON, NEGATIVE_ZONE];
 
 export const TRACK_STORAGE_KEY = 'kr.track';
 

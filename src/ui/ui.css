@@ -1861,8 +1861,8 @@ html[data-touch][data-touch-hand="left"] .kr .kr-pos {
   color: rgba(255, 252, 244, 0.62);
   line-height: 1.35;
 }
-.kr-s-track .kr-roster { grid-template-columns: repeat(4, minmax(0, 23vmin)); justify-content: center; }
-@media (max-aspect-ratio: 1/1) { .kr-s-track .kr-roster { grid-template-columns: repeat(2, minmax(0, 42vmin)); } }
+.kr-s-track .kr-roster { grid-template-columns: repeat(5, minmax(0, 19.5vmin)); justify-content: center; }
+@media (max-aspect-ratio: 1/1) { .kr-s-track .kr-roster { grid-template-columns: repeat(2, minmax(0, 40vmin)); } }
 
 .kr-stats { margin-top: 1vmin; display: flex; flex-direction: column; gap: 0.55vmin; }
 .kr-stat { display: grid; grid-template-columns: 4.6em 1fr; align-items: center; gap: 0.6em; }

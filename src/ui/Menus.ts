@@ -23,6 +23,7 @@ const TRACK_TAGLINES: Record<string, string> = {
   'neon-horizon': '3 laps — shore straight, ridge climb, banked carousel',
   'summit-sprint': 'Sprint — one flying run over the mountain, hairpins and a summit tunnel',
   'vapor-canyon': '3 laps — tunnel dive, river flat-out, wall carousel, canyon bridge',
+  'negative-zone': '3 laps — the sawtooth, the blade, and the bolt. In black and white.',
 };
 
 /** card accent per circuit */
@@ -31,6 +32,7 @@ const TRACK_ACCENTS: Record<string, string> = {
   'neon-horizon': '#ff2d95',
   'summit-sprint': '#4fe8ff',
   'vapor-canyon': '#b44fff',
+  'negative-zone': '#f4f2ff',
 };
 
 /**
