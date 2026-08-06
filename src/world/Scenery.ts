@@ -680,7 +680,10 @@ export class Scenery implements System {
       data[o] = clamp(depth, 0, 1) * 255;
       data[o + 1] = clamp(shoreFoam, 0, 1) * 255;
       data[o + 2] = clamp(cliffFoam, 0, 1) * 255;
-      data[o + 3] = 255;
+      // A carries RAW distance-to-shore, metres over 160, for the shore-roller
+      // system: rollers are curves of constant shore distance, so this one
+      // channel is what lets breaking waves wrap parallel to any coastline.
+      data[o + 3] = clamp(d / 160, 0, 1) * 255;
     }
     return { origin, size, res, data };
   }

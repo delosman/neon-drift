@@ -258,6 +258,24 @@ vec3 waveSet(vec2 p, float t, float atten, float chop) {
 //  alias against; and 118 / 46 / 21 m still subtend tens of screen pixels at a
 //  kilometre, so there is nothing to alias in screen space either. Returns
 //  (height, d/dx, d/dz) exactly like waveSet(), at a quarter of the cost.
+// ---------------------------------------------------------------------------
+//  SHORE ROLLERS — breaking waves that travel toward the beach.
+// ---------------------------------------------------------------------------
+//  Phase is a function of DISTANCE TO SHORE (baked field, A channel), so a
+//  crest is a curve of constant shore distance: rollers wrap parallel to any
+//  coastline for free, steepen across the shoaling band, and die at the
+//  waterline where the surf-line foam takes over. 26 m between crests at a
+//  5.8 s period reads lively without turning the bay into storm surf.
+const float ROLL_K = 6.28318 / 26.0;
+const float ROLL_W = 6.28318 / 5.8;
+float rollerPhase(float d, float t) { return d * ROLL_K + t * ROLL_W; }
+// zero far out, full across the 12-40 m shoaling band, gone at the waterline
+float rollerEnv(float d) { return smoothstep(104.0, 46.0, d) * smoothstep(2.5, 12.0, d); }
+float rollerHeight(float d, float t) {
+  float c = pow(0.5 + 0.5 * sin(rollerPhase(d, t)), 3.0);
+  return 0.42 * c * rollerEnv(d);
+}
+
 vec3 swellSet(vec2 p, float t) {
   vec3 acc = vec3(0.0);
   const vec4 S0 = vec4( 0.66,  0.75, 118.0, 0.62);
@@ -296,7 +314,9 @@ ${WAVES}
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec2 fuv = (wp.xz - uFieldOrigin) / uFieldSize;
-  vec3 shore = texture2D(uField, clamp(fuv, 0.002, 0.998)).rgb;
+  vec4 shore4 = texture2D(uField, clamp(fuv, 0.002, 0.998));
+  vec3 shore = shore4.rgb;
+  float shoreD = shore4.a * 160.0;
   // Waves flatten as the bottom comes up — shoaling, and it keeps the shoreline
   // from tearing through the beach geometry.
   float atten = mix(0.32, 1.0, shore.r);
@@ -312,7 +332,7 @@ void main() {
   // fragment stage carries the far water — so the fade can be as conservative
   // as the grid's own sampling rate demands without flattening the bay.
   float horizonFade = 1.0 - smoothstep(900.0, 2300.0, dist);
-  wp.y = uLevel + w.x * horizonFade;
+  wp.y = uLevel + w.x * horizonFade + rollerHeight(shoreD, uTime) * horizonFade;
   vWorld = wp.xyz;
   vWaveD = vec3(w.x * horizonFade, w.yz);
   vShore = shore;
@@ -331,6 +351,9 @@ uniform vec3 uSunDir;
 uniform vec3 uSunCol;
 uniform float uChop;
 uniform float uEnvIntensity;
+uniform sampler2D uField;
+uniform vec2 uFieldOrigin;
+uniform float uFieldSize;
 #ifdef ENV_CUBE
   uniform samplerCube uEnv;
 #endif
@@ -443,6 +466,26 @@ void main() {
   float swellW = mix(0.30, 1.0, flatten01) * mix(0.45, 1.0, vShore.r);
   N = normalize(vec3(N.x - sw.y * 0.42 * swellW, N.y, N.z - sw.z * 0.42 * swellW));
 
+  // --- shore rollers: per-pixel distance and its gradient ------------------
+  // The vertex-interpolated field smears across the big far triangles; the
+  // rollers need a crisp phase, so the field is re-sampled per fragment. Two
+  // one-sided taps 4 m apart give the travel direction (the distance field's
+  // gradient points away from shore).
+  vec2 rfuv = clamp((vWorld.xz - uFieldOrigin) / uFieldSize, 0.002, 0.998);
+  float shoreD = texture2D(uField, rfuv).a * 160.0;
+  vec2 rEps = vec2(4.0 / uFieldSize, 0.0);
+  float shoreDX = texture2D(uField, clamp(rfuv + rEps.xy, 0.002, 0.998)).a * 160.0;
+  float shoreDZ = texture2D(uField, clamp(rfuv + rEps.yx, 0.002, 0.998)).a * 160.0;
+  vec2 rollDir = normalize(vec2(shoreDX - shoreD, shoreDZ - shoreD) + vec2(1e-4));
+  float rph = rollerPhase(shoreD, uTime);
+  float renv = rollerEnv(shoreD) * (1.0 - flatten01 * 0.55);
+  float rsin = sin(rph);
+  float rcrest = pow(0.5 + 0.5 * rsin, 3.0);
+  // tilt the normal along the travel direction: steep face toward the beach,
+  // long back toward the sea — the asymmetry is what reads as "breaking"
+  float rslope = renv * pow(0.5 + 0.5 * rsin, 2.0) * cos(rph) * 3.6;
+  N = normalize(vec3(N.x + rollDir.x * rslope, N.y, N.z + rollDir.y * rslope));
+
   float ndv = max(dot(N, V), 0.0);
   // Capped Fresnel. Physically the grazing limit is 1.0 and the sea becomes a
   // pure mirror; pictorially that throws away the entire #3fc9c4 -> #0d5a7a
@@ -479,6 +522,9 @@ void main() {
   // crests; at 118 m and 46 m this is a broad, slow corduroy that reads as a
   // moving surface at any range and cannot alias at any of them.
   body *= 1.0 + clamp(sw.x, -1.0, 1.0) * 0.36;
+  // Aeration: the water inside a shoaling crest lightens toward the shelf
+  // colour — the glassy-green wall a wave shows just before it breaks.
+  body += SHALLOW * (0.55 + 0.45 * upwell) * rcrest * renv * (1.0 - depth01) * 1.15;
 
   // --- specular: a tight lobe scaled to a KNOWN peak. A physical GGX D term
   // peaks in the hundreds of thousands at water roughness and would detonate
@@ -522,13 +568,30 @@ void main() {
   // --- foam
   float shoreFoam = vShore.g;
   float cliffFoam = vShore.b;
+  // Breaking rollers: a bright foam lip riding just ahead of each crest,
+  // intensifying across the last 40 m, with a softer wash trailing behind it.
+  float rbreak = smoothstep(46.0, 10.0, shoreD);
+  float rollerFoam = renv * (pow(0.5 + 0.5 * sin(rph + 0.9), 4.0) * (0.34 + 0.66 * rbreak)
+                   + 0.5 * pow(0.5 + 0.5 * sin(rph - 1.3), 2.0) * rbreak);
   // the shoreline band surges with the swell instead of sitting still
-  float surge = sin(vWorld.x * 0.22 + vWorld.z * 0.19 - uTime * 1.35) * 0.5 + 0.5;
-  // Two bands, not one. A constant base band is the SURF LINE — the white edge
-  // every coastal reference has and the review kept asking for — and the lace
-  // modulation rides on top of it instead of gating it to nothing.
-  float foam = shoreFoam * (0.38 + 0.62 * smoothstep(0.12, 0.82, surge * 0.55 + lace * 0.65));
-  foam += smoothstep(0.72, 0.96, shoreFoam) * 0.6;
+  // The surf line surges when a roller ARRIVES, not on its own clock — the
+  // roller phase evaluated at the waterline is the arrival schedule.
+  float surge = 0.5 + 0.5 * sin(rollerPhase(shoreD, uTime));
+  // STRUCTURED surf, not a white blanket. The uniform 44 m wash was being
+  // read as MORE SAND — foam only parses as foam when it has edges and the
+  // water shows through between pulses. Three parts:
+  //   1. a crisp, always-on waterline lip in the last few metres,
+  //   2. scalloped crescents through the swash zone, gated by the arriving
+  //      roller and scalloped along-shore so they read as tongues of wash,
+  //   3. thin directional backwash streaks between crescents.
+  float scallop = 0.5 + 0.5 * sin(dot(vWorld.xz, vec2(rollDir.y, -rollDir.x)) * 0.42 + hash21(floor(vWorld.xz * 0.06)) * 6.28);
+  float lip = (1.0 - smoothstep(1.5, 6.5, shoreD)) * (0.55 + 0.45 * surge);
+  float crescents = smoothstep(4.0, 9.0, shoreD) * (1.0 - smoothstep(14.0, 34.0, shoreD))
+                  * smoothstep(0.28, 0.72, surge * 0.62 + scallop * 0.38 + lace * 0.22 - 0.18);
+  float backwash = smoothstep(6.0, 12.0, shoreD) * (1.0 - smoothstep(24.0, 42.0, shoreD))
+                 * smoothstep(0.55, 0.9, scallop) * 0.30 * (1.0 - surge * 0.5);
+  float foam = shoreFoam * clamp(lip + crescents * 0.9 + backwash, 0.0, 1.0);
+  foam += rollerFoam * 0.9;
   foam += cliffFoam * (0.45 + 0.55 * abs(sin(vWorld.x * 0.35 + uTime * 1.9))) * lace;
   // whitecaps on the steepest crests of the near field
   float steep = length(vWaveD.yz);

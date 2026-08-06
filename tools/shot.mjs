@@ -91,6 +91,7 @@ const SHOTS = [
   { name: 'sunward',     t: 0.45, speed: 22, desc: 'Cliff traverse driving into the low sun' },
   { name: 'pad',         t: 0.945, speed: 16, desc: 'Approaching the finish-straight boost pads' },
   { name: 'harbour',     t: 0.685, speed: 20, desc: 'Beach descent — open sea fills the right of frame' },
+  { name: 'rollers',     t: 0.625, speed: 16, desc: 'Beach shoaling band — breaking shore rollers at close range' },
 ];
 
 /** seconds of pinned running after the mark is reached, before the shutter */
