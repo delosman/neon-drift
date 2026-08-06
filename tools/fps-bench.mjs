@@ -338,13 +338,14 @@ const f2 = (v) => (Number.isFinite(v) ? v.toFixed(2) : '  n/a');
 const srv = await startVite(PORT);
 
 const browser = await puppeteer.launch({
-  headless: 'shell',
+  headless: true,
   args: [
     '--no-sandbox',
     // Required: without it headless Chrome takes the software path and every
     // number below is fiction. Note the DELIBERATE absence of
     // `--enable-unsafe-swiftshader` — see the header.
     '--use-gl=angle',
+    ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : []),
     '--enable-gpu',
     `--window-size=${P.width},${P.height}`,
     // Only ever added by --force-software, to prove the refusal below works.

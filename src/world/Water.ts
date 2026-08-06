@@ -587,18 +587,25 @@ void main() {
   // gradient points away from shore).
   vec2 rfuv = clamp((vWorld.xz - uFieldOrigin) / uFieldSize, 0.002, 0.998);
   float shoreD = texture2D(uField, rfuv).a * 160.0;
-  vec2 rEps = vec2(4.0 / uFieldSize, 0.0);
-  float shoreDX = texture2D(uField, clamp(rfuv + rEps.xy, 0.002, 0.998)).a * 160.0;
-  float shoreDZ = texture2D(uField, clamp(rfuv + rEps.yx, 0.002, 0.998)).a * 160.0;
-  vec2 rollDir = normalize(vec2(shoreDX - shoreD, shoreDZ - shoreD) + vec2(1e-4));
   float rph = rollerPhase(shoreD, uTime);
   float renv = rollerEnv(shoreD) * (1.0 - flatten01 * 0.55);
   float rsin = sin(rph);
   float rcrest = pow(0.5 + 0.5 * rsin, 3.0);
-  // tilt the normal along the travel direction: steep face toward the beach,
-  // long back toward the sea — the asymmetry is what reads as "breaking"
-  float rslope = renv * pow(0.5 + 0.5 * rsin, 2.0) * cos(rph) * 3.6;
-  N = normalize(vec3(N.x + rollDir.x * rslope, N.y, N.z + rollDir.y * rslope));
+  vec2 rollDir = vec2(0.707, 0.707);
+  // The two gradient taps and the normal tilt only exist inside the shoaling
+  // band. Most of the bay is open water where rollerEnv is exactly zero, and
+  // the branch is spatially coherent (a band along the coast), so this is a
+  // real fragment saving rather than a divergent one.
+  if (renv > 0.001) {
+    vec2 rEps = vec2(4.0 / uFieldSize, 0.0);
+    float shoreDX = texture2D(uField, clamp(rfuv + rEps.xy, 0.002, 0.998)).a * 160.0;
+    float shoreDZ = texture2D(uField, clamp(rfuv + rEps.yx, 0.002, 0.998)).a * 160.0;
+    rollDir = normalize(vec2(shoreDX - shoreD, shoreDZ - shoreD) + vec2(1e-4));
+    // tilt the normal along the travel direction: steep face toward the beach,
+    // long back toward the sea — the asymmetry is what reads as "breaking"
+    float rslope = renv * pow(0.5 + 0.5 * rsin, 2.0) * cos(rph) * 3.6;
+    N = normalize(vec3(N.x + rollDir.x * rslope, N.y, N.z + rollDir.y * rslope));
+  }
 
   float ndv = max(dot(N, V), 0.0);
   // Capped Fresnel. Physically the grazing limit is 1.0 and the sea becomes a

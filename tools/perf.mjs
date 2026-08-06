@@ -19,7 +19,8 @@ import { join } from 'node:path';
 import puppeteer from 'puppeteer';
 import { startVite } from './vite-server.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
 const OUT = join(root, arg('out', 'shots/perf'));
@@ -217,7 +218,7 @@ const main = async () => {
   if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
   const browser = await puppeteer.launch({
-    headless: 'shell',
+    headless: true,
     args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-gl=angle', '--enable-webgl',
       '--ignore-gpu-blocklist', '--enable-gpu-rasterization', `--window-size=${W},${H}`, '--hide-scrollbars'],
   });
