@@ -249,80 +249,72 @@ const NEON_HORIZON: TrackDef = {
   dressLabel: 'stringing the neon',
   kit: 'gridline',
   laps: 3,
+  // Waypoint-designed plan: an ELONGATED GP loop — nothing like the bay's
+  // kidney. Long start straight, a fast multi-apex end loop, a shore straight
+  // on the sea, a ridge notch, a banked west carousel, and the run home.
   legs: [
-    [230, -16.95],  // 0.000 start straight
-    [110, -100.03], // 0.163 T1 sweeping left
-    [190, -22.23],  // 0.241 esplanade
-    [85, -74.65],   // 0.376 T2 diving to the shore
-    [180, 8.17],    // 0.436 shore straight, sea level
-    [60, 59.91],    // 0.564 T3 right flick into the climb
-    [75, -35.89],   // 0.606 T4 over the crest
-    [95, -86.23],   // 0.660 carousel A — banked, high over the water
-    [90, -76.44],   // 0.727 carousel B
-    [70, 47.72],    // 0.791 chicane in (right, off-camber)
-    [55, -49.09],   // 0.840 chicane out (left)
-    [170, -27.67],  // 0.879 run home
+    [324, -25.98],  // v0  0.000 start straight
+    [76, -43.68],   // v1  0.207 end loop in
+    [73, -60.62],   // v2  0.256 end loop apex
+    [82, -44.47],   // v3  0.303 end loop out
+    [86, -11.90],   // v4  0.355 exit kink
+    [128, 30.57],   // v5  0.411 shore straight (right drift)
+    [69, 19.16],    // v6  0.492 shore kink
+    [106, -48.12],  // v7  0.536 ridge notch in
+    [85, -70.73],   // v8  0.604 notch apex
+    [88, 43.57],    // v9  0.659 notch out (right)
+    [74, -37.91],   // v10 0.715 carousel in
+    [91, -35.81],   // v11 0.763 carousel apex
+    [78, -53.24],   // v12 0.821 carousel out
+    [90, -30.00],   // v13 0.871 chicane sweep
+    [111, 8.07],    // v14 0.929 run home
   ],
-  startHeading: 45,
+  startHeading: 0,
   elevation: [
-    [0.000, 4.0], [0.080, 4.6], [0.160, 5.5], [0.240, 4.2],
-    [0.320, 3.4], [0.400, 2.8], [0.500, 3.0], [0.560, 5.5],
-    [0.620, 12.0], [0.680, 20.0], [0.730, 24.0], [0.790, 18.0],
-    [0.840, 12.0], [0.890, 8.0], [0.940, 5.6], [0.980, 4.4],
+    [0.000, 3.5], [0.100, 4.2], [0.207, 5.0], [0.300, 6.5],
+    [0.411, 3.4], [0.470, 2.8], [0.536, 4.0], [0.600, 9.0],
+    [0.660, 14.0], [0.715, 17.0], [0.800, 13.0], [0.871, 8.0],
+    [0.930, 5.0], [0.970, 3.8],
   ],
   halfWidth: [
-    [0.000, 8.8],   // eight-up standing start
-    [0.070, 8.4],
-    [0.160, 7.6],   // T1
-    [0.240, 7.4],
-    [0.300, 7.8],   // esplanade breathes
-    [0.376, 7.6],
-    [0.440, 7.2],   // shore straight
-    [0.500, 7.4],
-    [0.560, 6.6],   // pinching into the climb
-    [0.600, 5.9],
-    [0.640, 5.7],   // narrowest — the ridge ledge
-    [0.700, 6.8],
-    [0.730, 8.6],   // carousel — wide, banked, a passing lane
-    [0.800, 8.5],
-    [0.840, 7.4],   // chicane
-    [0.880, 6.8],
-    [0.920, 7.2],
-    [0.960, 8.2],   // back to the line
+    [0.000, 8.8], [0.090, 8.3], [0.207, 7.6], [0.260, 7.2],
+    [0.320, 7.4], [0.411, 8.0], [0.490, 7.8], [0.536, 6.6],
+    [0.600, 5.9], [0.660, 6.2], [0.715, 8.4], [0.800, 8.3],
+    [0.871, 7.0], [0.930, 7.6], [0.970, 8.4],
   ],
   bank: [
-    [0.000, 0], [0.100, 8], [0.160, 4], [0.200, 6], [0.300, 2],
-    [0.400, 3], [0.440, 5], [0.520, 2], [0.600, 6], [0.660, 4],
-    [0.710, 10], [0.750, 20], [0.800, 20], [0.830, 8],
-    [0.845, -4],   // chicane entry is a right-hander held off-camber
-    [0.865, -2], [0.890, 3], [0.930, 0], [0.970, 0],
+    [0.000, 0], [0.120, 4], [0.207, 8], [0.260, 10], [0.320, 8],
+    [0.380, 4], [0.411, 2], [0.470, -3], [0.500, -5],
+    [0.536, 4], [0.600, 7], [0.660, 6],
+    [0.715, 12], [0.760, 18], [0.820, 16],
+    [0.871, -4], [0.900, -2], [0.950, 0],
   ],
   zones: [
     { t0: 0.000, fade: 0.016, name: 'start',
       nearL: [0, -0.4, 1.6], farL: 16, farDL: 110, rockL: 0.1, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
       nearR: [-0.4, -1.6, -3.4], farR: -6, farDR: 60, rockR: 0.25, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
       cobble: 0, kerb: 1 },
-    { t0: 0.160, fade: 0.020, name: 'sweep',
+    { t0: 0.190, fade: 0.020, name: 'sweep',
       nearL: [0, -0.4, 2.0], farL: 20, farDL: 130, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
       nearR: [-0.4, -1.8, -3.6], farR: -6, farDR: 55, rockR: 0.25, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.360, fade: 0.024, name: 'shore',
+    { t0: 0.400, fade: 0.024, name: 'shore',
       nearL: [0, -0.5, 1.5], farL: 24, farDL: 130, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_NONE, wallOffL: 0,
       nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 90, rockR: 0.05, shoulderR: 12, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
       cobble: 0, kerb: 1 },
-    { t0: 0.590, fade: 0.014, name: 'ridge',
-      nearL: [0, 1.6, 14], farL: 55, farDL: 100, rockL: 0.95, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-      nearR: [-1.4, -9, -28], farR: -7, farDR: 40, rockR: 0.9, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_NONE, wallOffR: 0,
+    { t0: 0.530, fade: 0.014, name: 'ridge',
+      nearL: [0, 1.6, 14], farL: 50, farDL: 100, rockL: 0.95, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.4, -9, -28], farR: -7, farDR: 40, rockR: 0.9, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.715, fade: 0.016, name: 'carousel',
-      nearL: [0, -0.4, 2.5], farL: 32, farDL: 140, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.6,
+    { t0: 0.705, fade: 0.016, name: 'carousel',
+      nearL: [0, -0.4, 2.5], farL: 30, farDL: 140, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.6,
       nearR: [-1.0, -4.5, -15], farR: -7, farDR: 46, rockR: 0.5, shoulderR: 10, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
       cobble: 0, kerb: 1 },
-    { t0: 0.845, fade: 0.012, name: 'chicane',
-      nearL: [0, -0.5, 1.8], farL: 20, farDL: 120, rockL: 0.2, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
+    { t0: 0.865, fade: 0.012, name: 'chicane',
+      nearL: [0, -0.5, 1.8], farL: 18, farDL: 120, rockL: 0.2, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
       nearR: [-0.3, -1.4, -3.6], farR: -6, farDR: 100, rockR: 0.25, shoulderR: 6, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 2.7,
       cobble: 0, kerb: 1 },
-    { t0: 0.905, fade: 0.008, name: 'return',
+    { t0: 0.925, fade: 0.008, name: 'return',
       nearL: [0, -0.4, 1.4], farL: 18, farDL: 120, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
       nearR: [-0.4, -1.8, -4.0], farR: -6, farDR: 80, rockR: 0.25, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.4,
       cobble: 0, kerb: 1 },
@@ -330,14 +322,14 @@ const NEON_HORIZON: TrackDef = {
   tunnel: null,
   bridge: null,
   boostPads: [
-    { t0: 0.2900, t1: 0.3070, lat: -2.9, hw: 1.9 },
-    { t0: 0.2900, t1: 0.3070, lat: 2.9, hw: 1.9 },
-    { t0: 0.5050, t1: 0.5220, lat: 0.0, hw: 2.6 },
+    { t0: 0.4350, t1: 0.4520, lat: -2.9, hw: 1.9 },
+    { t0: 0.4350, t1: 0.4520, lat: 2.9, hw: 1.9 },
+    { t0: 0.3700, t1: 0.3870, lat: 0.0, hw: 2.4 },
     { t0: 0.9450, t1: 0.9620, lat: -3.0, hw: 2.0 },
     { t0: 0.9450, t1: 0.9620, lat: 3.0, hw: 2.0 },
   ],
-  boxRows: [0.055, 0.150, 0.245, 0.345, 0.445, 0.545, 0.645, 0.755, 0.870],
-  hoardingZones: [[0, 0.105], [0.68, 0.80]],
+  boxRows: [0.055, 0.160, 0.260, 0.350, 0.460, 0.570, 0.670, 0.780, 0.900],
+  hoardingZones: [[0, 0.10], [0.70, 0.87]],
 };
 
 // ===========================================================================
@@ -356,112 +348,101 @@ const SUMMIT_SPRINT: TrackDef = {
   dressLabel: 'carving the summit',
   kit: 'gridline',
   laps: 1,
+  // Waypoint-designed plan: a SWITCHBACK LADDER. Shore start, three stacked
+  // hairpin rungs up the west face, a tunnel through the summit ridge, then
+  // one long eastern plunge back to a seafront drag. The zigzag silhouette is
+  // the point — nothing else on the roster looks remotely like it.
   legs: [
-    [300, -15.48],  // 0.000 start boulevard on the seafront
-    [110, -88.78],  // 0.138 T1 long left onto the lower ramp
-    [180, 12.54],   // 0.189 lower ramp, gentle right drift
-    [85, -146.32],  // 0.272 switchback 1 (left hairpin)
-    [150, 8.94],    // 0.311 ramp 2
-    [85, 148.39],   // 0.380 switchback 2 (right hairpin)
-    [140, -8.84],   // 0.419 ramp 3
-    [90, -65.61],   // 0.484 summit approach left
-    [130, -13.04],  // 0.525 SUMMIT TUNNEL through the peak
-    [190, -92.33],  // 0.585 plunging descent sweeper left
-    [100, 38.43],   // 0.673 right flick mid-descent
-    [220, -66.46],  // 0.719 banked seafront curve
-    [90, -45.35],   // 0.820 harbour kink
-    [300, -37.81],  // 0.862 finish drag
+    [191, 25.69],    // v0  0.000 shore start
+    [88, 41.79],     // v1  0.089 shore curve
+    [74, 64.56],     // v2  0.130 climb-in
+    [77, 43.70],     // v3  0.165 base turn
+    [154, -46.55],   // v4  0.200 rung 1 (west)
+    [55, -115.86],   // v5  0.272 hairpin L
+    [155, 44.05],    // v6  0.297 rung 2 (east)
+    [61, 119.51],    // v7  0.369 hairpin R
+    [157, -26.20],   // v8  0.398 rung 3 (west)
+    [77, -94.45],    // v9  0.471 summit turn
+    [95, -43.95],    // v10 0.506 summit approach
+    [160, -35.36],   // v11 0.550 SUMMIT TUNNEL ridge
+    [108, -32.34],   // v12 0.624 ridge east
+    [115, -12.84],   // v13 0.675 plunge begins
+    [117, 11.89],    // v14 0.728 plunge kink
+    [128, -53.94],   // v15 0.783 plunge sweeper
+    [142, -30.36],   // v16 0.842 lower slope
+    [140, -22.47],   // v17 0.908 seafront drag
+    [57, -151.81],   // v18 0.974 final hook to the line
   ],
-  startHeading: 45,
+  startHeading: 3.81,
   elevation: [
-    [0.000, 4.0], [0.070, 4.6], [0.140, 6.0], [0.200, 11.0],
-    [0.270, 18.0], [0.310, 24.0], [0.380, 32.0], [0.420, 38.0],
-    [0.480, 46.0], [0.525, 52.0], [0.555, 54.0], [0.585, 52.5],
-    [0.640, 44.0], [0.700, 32.0], [0.760, 20.0], [0.820, 11.0],
-    [0.870, 7.0], [0.930, 4.6], [0.975, 4.0],
+    [0.000, 3.2], [0.089, 4.5], [0.130, 8.0], [0.165, 12.0],
+    [0.200, 16.0], [0.245, 21.0], [0.272, 24.0], [0.297, 27.0],
+    [0.340, 31.0], [0.369, 34.0], [0.398, 37.0], [0.440, 41.0],
+    [0.471, 44.0], [0.506, 48.0], [0.550, 52.0], [0.585, 53.0],
+    [0.624, 52.0], [0.675, 48.0], [0.720, 38.0], [0.783, 26.0],
+    [0.842, 15.0], [0.908, 6.0], [0.955, 3.8],
   ],
   halfWidth: [
-    [0.000, 8.8],   // eight-up standing start
-    [0.080, 8.4],
-    [0.140, 7.8],   // T1
-    [0.200, 7.2],
-    [0.270, 6.6],   // switchback 1 pinches
-    [0.310, 6.2],
-    [0.350, 6.6],
-    [0.419, 6.2],   // switchback 2
-    [0.460, 6.4],
-    [0.500, 6.0],   // summit approach
-    [0.527, 5.9],   // tunnel bore
-    [0.560, 6.1],
-    [0.590, 6.6],   // out of the mountain, opening
-    [0.640, 7.6],
-    [0.700, 8.0],
-    [0.740, 8.4],   // banked seafront — the passing lane
-    [0.820, 8.2],
-    [0.862, 7.2],   // harbour kink
-    [0.910, 7.6],
-    [0.960, 8.4],   // the drag to the line
+    [0.000, 8.8], [0.090, 8.2], [0.130, 7.4], [0.200, 6.6],
+    [0.272, 5.9], [0.300, 6.2], [0.369, 5.9], [0.400, 6.2],
+    [0.471, 6.0], [0.510, 6.4], [0.550, 6.0], [0.585, 6.0],
+    [0.624, 6.6], [0.675, 7.2], [0.780, 8.0], [0.842, 8.2],
+    [0.908, 8.6], [0.960, 8.8],
   ],
   bank: [
-    [0.000, 0], [0.090, 6], [0.150, 8], [0.210, 4],
-    [0.290, 10],   // switchback 1 is a left: banked in
-    [0.335, 2],
-    [0.395, -10],  // switchback 2 is a right: banked the other way
-    [0.445, 2], [0.490, 5], [0.545, 4], [0.610, 8],
-    [0.655, 12],   // plunging sweeper carries real bank
-    [0.695, -6],   // right flick, briefly off-camber
-    [0.740, 16], [0.790, 18], [0.835, 8], [0.875, 5],
-    [0.930, 2], [0.975, 0],
+    [0.000, 0], [0.100, 5], [0.160, 6], [0.220, 4],
+    [0.272, 12],   // left hairpin
+    [0.300, 4], [0.340, -4],
+    [0.383, -12],  // right hairpin, banked the other way
+    [0.410, -4], [0.471, 6], [0.490, 10], [0.530, 6],
+    [0.585, 4], [0.650, 4], [0.700, 8], [0.783, 10],
+    [0.842, 8], [0.900, 4], [0.940, 6], [0.975, 10],
   ],
   zones: [
-    { t0: 0.000, fade: 0.016, name: 'start',
-      nearL: [0, -0.4, 1.6], farL: 16, farDL: 110, rockL: 0.1, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
-      nearR: [-0.4, -1.6, -3.4], farR: -6, farDR: 60, rockR: 0.25, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
+    { t0: 0.000, fade: 0.016, name: 'shore',
+      nearL: [0, -0.4, 1.6], farL: 14, farDL: 110, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 70, rockR: 0.1, shoulderR: 10, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
       cobble: 0, kerb: 1 },
-    { t0: 0.140, fade: 0.020, name: 'coast',
-      nearL: [0, 0.4, 4.0], farL: 30, farDL: 110, rockL: 0.45, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
-      nearR: [-0.5, -2.2, -5.0], farR: -6, farDR: 70, rockR: 0.35, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+    { t0: 0.125, fade: 0.014, name: 'approach',
+      nearL: [0, 1.6, 12], farL: 44, farDL: 90, rockL: 0.85, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.0, -6, -18], farR: 2, farDR: 60, rockR: 0.7, shoulderR: 2, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.270, fade: 0.016, name: 'switchbacks',
-      nearL: [0, 1.6, 13], farL: 60, farDL: 90, rockL: 0.9, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-      nearR: [-1.2, -8, -26], farR: -7, farDR: 60, rockR: 0.85, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_NONE, wallOffR: 0,
+    { t0: 0.195, fade: 0.014, name: 'ladder',
+      nearL: [0, 1.4, 11], farL: 52, farDL: 85, rockL: 0.85, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.0, -6, -18], farR: 12, farDR: 55, rockR: 0.75, shoulderR: 2, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.0,
       cobble: 0, kerb: 1 },
-    { t0: 0.484, fade: 0.014, name: 'summit',
-      nearL: [0, 2.0, 14], farL: 66, farDL: 90, rockL: 0.95, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-      nearR: [0, 1.0, 8], farR: 60, farDR: 90, rockR: 0.9, shoulderR: 4, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
+    { t0: 0.500, fade: 0.014, name: 'summit',
+      nearL: [0, 2.0, 13], farL: 62, farDL: 85, rockL: 0.95, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [0, 1.4, 11], farR: 58, farDR: 85, rockR: 0.9, shoulderR: 5, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.525, fade: 0.013, name: 'tunnel',
-      nearL: [0, 2.6, 15], farL: 62, farDL: 90, rockL: 1, shoulderL: 3, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: TUNNEL_CLEAR - 0.15,
-      nearR: [0, 1.0, 10], farR: 58, farDR: 90, rockR: 1, shoulderR: 3, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: TUNNEL_CLEAR - 0.15,
+    { t0: 0.558, fade: 0.012, name: 'tunnel',
+      nearL: [0, 2.6, 15], farL: 64, farDL: 90, rockL: 1, shoulderL: 3, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: TUNNEL_CLEAR - 0.15,
+      nearR: [0, 1.0, 10], farR: 60, farDR: 90, rockR: 1, shoulderR: 3, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: TUNNEL_CLEAR - 0.15,
       cobble: 0, kerb: 1 },
-    { t0: 0.588, fade: 0.016, name: 'descent',
-      nearL: [0, 1.4, 12], farL: 54, farDL: 100, rockL: 0.85, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-      nearR: [-1.2, -7, -22], farR: -7, farDR: 55, rockR: 0.8, shoulderR: 2.0, surfR: Surface.Dirt, wallR: WALL_NONE, wallOffR: 0,
+    { t0: 0.620, fade: 0.014, name: 'ridge',
+      nearL: [0, 1.6, 12], farL: 58, farDL: 85, rockL: 0.9, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -7, -22], farR: 8, farDR: 50, rockR: 0.85, shoulderR: 1.8, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.719, fade: 0.018, name: 'seafront',
-      nearL: [0, -0.4, 2.5], farL: 26, farDL: 130, rockL: 0.3, shoulderL: 8, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.6,
-      nearR: [-0.8, -3.5, -10], farR: -6, farDR: 80, rockR: 0.2, shoulderR: 10, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
+    { t0: 0.670, fade: 0.016, name: 'plunge',
+      nearL: [0, 1.4, 11], farL: 40, farDL: 90, rockL: 0.8, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.0, -6, -18], farR: 2, farDR: 60, rockR: 0.6, shoulderR: 2.5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.0,
       cobble: 0, kerb: 1 },
-    { t0: 0.862, fade: 0.012, name: 'harbour',
-      nearL: [0, -0.5, 1.8], farL: 20, farDL: 120, rockL: 0.2, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 2.7,
-      nearR: [-0.3, -1.4, -3.6], farR: -6, farDR: 90, rockR: 0.25, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.7,
-      cobble: 0, kerb: 1 },
-    { t0: 0.930, fade: 0.008, name: 'return',
-      nearL: [0, -0.4, 1.4], farL: 18, farDL: 120, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
-      nearR: [-0.4, -1.8, -4.0], farR: -6, farDR: 80, rockR: 0.25, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.4,
+    { t0: 0.900, fade: 0.014, name: 'drag',
+      nearL: [0, -0.4, 1.5], farL: 12, farDL: 100, rockL: 0.15, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
+      nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 70, rockR: 0.1, shoulderR: 10, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
       cobble: 0, kerb: 1 },
   ],
-  tunnel: [0.527, 0.582],
+  tunnel: [0.565, 0.612],
   bridge: null,
   boostPads: [
-    { t0: 0.5320, t1: 0.5490, lat: -2.9, hw: 1.9 },
-    { t0: 0.5320, t1: 0.5490, lat: 2.9, hw: 1.9 },
-    { t0: 0.6360, t1: 0.6530, lat: 0.0, hw: 2.6 },
-    { t0: 0.9360, t1: 0.9530, lat: -3.0, hw: 2.0 },
-    { t0: 0.9360, t1: 0.9530, lat: 3.0, hw: 2.0 },
+    { t0: 0.0500, t1: 0.0670, lat: -2.9, hw: 1.9 },
+    { t0: 0.0500, t1: 0.0670, lat: 2.9, hw: 1.9 },
+    { t0: 0.8000, t1: 0.8170, lat: 0.0, hw: 2.6 },
+    { t0: 0.9550, t1: 0.9720, lat: -3.0, hw: 2.0 },
+    { t0: 0.9550, t1: 0.9720, lat: 3.0, hw: 2.0 },
   ],
-  boxRows: [0.055, 0.160, 0.250, 0.345, 0.440, 0.510, 0.615, 0.690, 0.775, 0.885],
-  hoardingZones: [[0, 0.10], [0.70, 0.84]],
+  boxRows: [0.100, 0.180, 0.310, 0.420, 0.520, 0.640, 0.730, 0.860, 0.930],
+  hoardingZones: [[0, 0.09], [0.67, 0.85]],
 };
 
 // ===========================================================================
@@ -480,119 +461,105 @@ const VAPOR_CANYON: TrackDef = {
   dressLabel: 'carving the canyon',
   kit: 'gridline',
   laps: 3,
+  // Waypoint-designed plan: a DUMBBELL. Two lobes — the low canyon-floor loop
+  // east, the high mesa-rim loop west — joined by two parallel straights
+  // through the waist. The tunnel dives into the east lobe; the bridge
+  // carries the north neck back across the gorge at height; the karts on the
+  // other neck are visible across the waist all lap long.
   legs: [
-    [300, -4.13],   // 0.000 mesa straight, high on the rim
-    [90, -78.87],   // 0.171 T1 sweeping left into the canyon wall
-    [110, -17.31],  // 0.223 TUNNEL DIVE — descending bore through the rock
-    [130, -74.96],  // 0.286 canyon hook left, still descending
-    [280, 6.79],    // 0.360 river flat-out along the inlet
-    [80, 72.98],    // 0.520 T3 right onto the climb
-    [120, -44.48],  // 0.566 climbing sweeper
-    [90, -115.24],  // 0.634 wall carousel — banked, cut into the face
-    [100, -22.13],  // 0.686 rim approach
-    [90, 16.37],    // 0.743 BRIDGE back across the canyon
-    [190, -48.72],  // 0.794 rim return sweeper
-    [170, -50.50],  // 0.903 final drop to the line
+    [216, 42.53],    // v0  0.000 start straight, the south neck (right-hand drift)
+    [107, -35.49],   // v1  0.121 TUNNEL DIVE in
+    [101, -57.37],   // v2  0.181 tunnel bend
+    [105, -42.49],   // v3  0.238 east lobe descent
+    [87, -40.40],    // v4  0.297 canyon floor
+    [102, -49.57],   // v5  0.346 floor apex
+    [101, -47.09],   // v6  0.403 floor exit
+    [102, 50.53],    // v7  0.460 climb hook (right)
+    [216, 35.79],    // v8  0.517 north neck — the BRIDGE back across
+    [98, -27.87],    // v9  0.639 west lobe in
+    [95, -57.55],    // v10 0.694 rim bend
+    [92, -48.96],    // v11 0.747 carousel
+    [91, -44.34],    // v12 0.798 carousel apex
+    [92, -45.34],    // v13 0.849 carousel exit
+    [87, -35.83],    // v14 0.901 rim out
+    [89, 43.55],     // v15 0.950 final hook to the line
   ],
-  startHeading: 45,
+  startHeading: 0,
   elevation: [
-    [0.000, 30.0], [0.060, 30.5], [0.140, 29.0], [0.190, 26.5],
-    [0.226, 24.0], [0.260, 18.0], [0.288, 14.0], [0.340, 8.0],
-    [0.420, 4.0], [0.500, 3.2], [0.550, 6.0], [0.600, 12.0],
-    [0.634, 18.0], [0.686, 26.0], [0.720, 30.0], [0.746, 32.0],
-    [0.770, 32.5], [0.794, 32.0], [0.850, 31.0], [0.920, 30.3],
-    [0.970, 30.0],
+    [0.000, 26.0], [0.060, 26.2], [0.121, 25.0], [0.150, 22.0],
+    [0.181, 18.0], [0.238, 12.0], [0.297, 8.5], [0.360, 7.0],
+    [0.420, 6.5], [0.440, 7.5], [0.480, 13.0], [0.517, 20.0],
+    [0.545, 24.0], [0.600, 24.5], [0.639, 24.0], [0.700, 25.0],
+    [0.760, 27.0], [0.830, 28.0], [0.900, 27.0], [0.950, 26.3],
   ],
   halfWidth: [
-    [0.000, 8.8],
-    [0.080, 8.4],
-    [0.171, 7.4],
-    [0.200, 6.6],
-    [0.226, 6.0],
-    [0.260, 6.0],
-    [0.288, 6.6],
-    [0.320, 7.0],
-    [0.360, 7.6],
-    [0.440, 8.2],
-    [0.500, 8.0],
-    [0.550, 7.4],
-    [0.600, 6.8],
-    [0.634, 8.4],
-    [0.686, 8.2],
-    [0.720, 7.2],
-    [0.746, 7.0],
-    [0.790, 7.0],
-    [0.800, 7.6],
-    [0.860, 7.8],
-    [0.930, 8.2],
-    [0.970, 8.6],
+    [0.000, 8.8], [0.090, 8.2], [0.121, 7.2], [0.160, 6.6],
+    [0.200, 6.6], [0.238, 7.0], [0.297, 7.4], [0.360, 8.0],
+    [0.420, 8.2], [0.460, 7.6], [0.517, 7.2], [0.545, 7.0],
+    [0.600, 7.0], [0.639, 7.6], [0.700, 8.2], [0.760, 8.4],
+    [0.830, 8.3], [0.900, 7.9], [0.950, 8.6],
   ],
   bank: [
-    [0.000, 0], [0.100, 6], [0.190, 8], [0.240, 4], [0.300, 8],
-    [0.340, 4], [0.400, 2], [0.470, 3],
-    [0.520, -4],
-    [0.560, -2], [0.600, 6],
-    [0.640, 14], [0.660, 20], [0.685, 18],
-    [0.710, 6], [0.746, -3], [0.770, -2], [0.794, 2],
-    [0.850, 8], [0.900, 4], [0.960, 0],
+    [0.000, 0], [0.100, 3], [0.140, 6], [0.200, 7], [0.250, 9],
+    [0.300, 10], [0.360, 12], [0.420, 10],
+    [0.460, -8], [0.490, -8],   // the climb hook is a right-hander
+    [0.517, 0], [0.600, 0], [0.639, 4],
+    [0.700, 12], [0.760, 18], [0.830, 16], [0.900, 10],
+    [0.945, 2], [0.965, -7], [0.990, -1],
   ],
   zones: [
     { t0: 0.000, fade: 0.016, name: 'mesa',
       nearL: [0, -0.4, 1.6], farL: 26, farDL: 120, rockL: 0.2, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
       nearR: [-0.3, -1.2, -2.6], farR: 24, farDR: 120, rockR: 0.3, shoulderR: 7, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 3.6,
       cobble: 0, kerb: 1 },
-    { t0: 0.171, fade: 0.014, name: 'wall',
-      nearL: [0, 1.6, 12], farL: 60, farDL: 90, rockL: 0.9, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-      nearR: [-1.2, -8, -24], farR: 4, farDR: 55, rockR: 0.85, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+    { t0: 0.112, fade: 0.010, name: 'wall',
+      nearL: [0, 1.6, 12], farL: 56, farDL: 90, rockL: 0.9, shoulderL: 6, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -8, -24], farR: 6, farDR: 55, rockR: 0.85, shoulderR: 1.5, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.223, fade: 0.013, name: 'tunnel',
+    { t0: 0.125, fade: 0.012, name: 'tunnel',
       nearL: [0, 2.6, 15], farL: 58, farDL: 90, rockL: 1, shoulderL: 3, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: TUNNEL_CLEAR - 0.15,
       nearR: [0, 1.0, 10], farR: 54, farDR: 90, rockR: 1, shoulderR: 3, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: TUNNEL_CLEAR - 0.15,
       cobble: 0, kerb: 1 },
-    { t0: 0.288, fade: 0.016, name: 'canyon',
-      nearL: [0, 1.6, 13], farL: 58, farDL: 85, rockL: 0.95, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
-      nearR: [-1.2, -7, -22], farR: 3, farDR: 45, rockR: 0.85, shoulderR: 1.8, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
+    { t0: 0.200, fade: 0.014, name: 'canyon',
+      nearL: [0, 1.6, 13], farL: 54, farDL: 85, rockL: 0.95, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+      nearR: [-1.2, -7, -22], farR: 4, farDR: 45, rockR: 0.85, shoulderR: 1.8, surfR: Surface.Dirt, wallR: WALL_GUARDRAIL, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.355, fade: 0.020, name: 'river',
-      nearL: [0, 1.2, 10], farL: 32, farDL: 80, rockL: 0.6, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
+    { t0: 0.290, fade: 0.020, name: 'river',
+      nearL: [0, 1.2, 10], farL: 30, farDL: 80, rockL: 0.6, shoulderL: 5, surfL: Surface.Dirt, wallL: WALL_ROCK, wallOffL: 2.9,
       nearR: [-0.4, -1.6, -3.0], farR: -6, farDR: 70, rockR: 0.1, shoulderR: 11, surfR: Surface.Sand, wallR: WALL_NONE, wallOffR: 0,
       cobble: 0, kerb: 1 },
-    { t0: 0.515, fade: 0.016, name: 'climb',
-      nearL: [-1.2, -8, -24], farL: 2, farDL: 50, rockL: 0.85, shoulderL: 1.5, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
-      nearR: [0, 1.6, 12], farR: 56, farDR: 90, rockR: 0.9, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
+    { t0: 0.450, fade: 0.014, name: 'climb',
+      nearL: [-1.2, -8, -24], farL: 4, farDL: 50, rockL: 0.85, shoulderL: 1.5, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
+      nearR: [0, 1.6, 12], farR: 52, farDR: 90, rockR: 0.9, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.630, fade: 0.014, name: 'carousel',
-      nearL: [-1.0, -5, -16], farL: 3, farDL: 60, rockL: 0.7, shoulderL: 8, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
-      nearR: [0, 2.0, 14], farR: 62, farDR: 85, rockR: 0.95, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
-      cobble: 0, kerb: 1 },
-    { t0: 0.700, fade: 0.012, name: 'rim',
-      nearL: [-0.8, -4, -12], farL: 4, farDL: 70, rockL: 0.6, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
+    { t0: 0.542, fade: 0.006, name: 'bridge',
+      nearL: [-1.5, -9, -20], farL: 4, farDL: 46, rockL: 0.8, shoulderL: 0.6, surfL: Surface.Dirt, wallL: WALL_PARAPET, wallOffL: PARAPET_FACE,
+      nearR: [-1.5, -9, -20], farR: 4, farDR: 46, rockR: 0.8, shoulderR: 0.6, surfR: Surface.Dirt, wallR: WALL_PARAPET, wallOffR: PARAPET_FACE,
+      cobble: 0.55, kerb: 0 },
+    { t0: 0.601, fade: 0.010, name: 'rim',
+      nearL: [-0.8, -4, -12], farL: 6, farDL: 70, rockL: 0.6, shoulderL: 6, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
       nearR: [0, -0.4, 1.5], farR: 26, farDR: 100, rockR: 0.35, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_NONE, wallOffR: 0,
       cobble: 0, kerb: 1 },
-    { t0: 0.743, fade: 0.006, name: 'bridge',
-      nearL: [-1.5, -9, -20], farL: 2, farDL: 46, rockL: 0.8, shoulderL: 0.6, surfL: Surface.Dirt, wallL: WALL_PARAPET, wallOffL: PARAPET_FACE,
-      nearR: [-1.5, -9, -20], farR: 2, farDR: 46, rockR: 0.8, shoulderR: 0.6, surfR: Surface.Dirt, wallR: WALL_PARAPET, wallOffR: PARAPET_FACE,
-      cobble: 0.55, kerb: 0 },
-    { t0: 0.794, fade: 0.010, name: 'rimreturn',
-      nearL: [0, -0.5, 1.6], farL: 24, farDL: 110, rockL: 0.3, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.2,
-      nearR: [-0.4, -1.6, -3.4], farR: 26, farDR: 110, rockR: 0.35, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.2,
+    { t0: 0.680, fade: 0.014, name: 'carousel',
+      nearL: [-1.0, -5, -16], farL: 6, farDL: 60, rockL: 0.7, shoulderL: 8, surfL: Surface.Dirt, wallL: WALL_GUARDRAIL, wallOffL: 3.0,
+      nearR: [0, 2.0, 14], farR: 58, farDR: 85, rockR: 0.95, shoulderR: 6, surfR: Surface.Dirt, wallR: WALL_ROCK, wallOffR: 2.9,
       cobble: 0, kerb: 1 },
-    { t0: 0.930, fade: 0.008, name: 'return',
+    { t0: 0.940, fade: 0.010, name: 'return',
       nearL: [0, -0.4, 1.4], farL: 26, farDL: 120, rockL: 0.2, shoulderL: 7, surfL: Surface.Grass, wallL: WALL_GUARDRAIL, wallOffL: 3.4,
       nearR: [-0.4, -1.8, -4.0], farR: 25, farDR: 100, rockR: 0.25, shoulderR: 7, surfR: Surface.Grass, wallR: WALL_GUARDRAIL, wallOffR: 3.4,
       cobble: 0, kerb: 1 },
   ],
-  tunnel: [0.226, 0.283],
-  bridge: [0.746, 0.791],
+  tunnel: [0.128, 0.194],
+  bridge: [0.548, 0.596],
   boostPads: [
-    { t0: 0.4150, t1: 0.4320, lat: -2.9, hw: 1.9 },
-    { t0: 0.4150, t1: 0.4320, lat: 2.9, hw: 1.9 },
-    { t0: 0.8300, t1: 0.8470, lat: 0.0, hw: 2.6 },
-    { t0: 0.9450, t1: 0.9620, lat: -3.0, hw: 2.0 },
-    { t0: 0.9450, t1: 0.9620, lat: 3.0, hw: 2.0 },
+    { t0: 0.3600, t1: 0.3770, lat: -2.9, hw: 1.9 },
+    { t0: 0.3600, t1: 0.3770, lat: 2.9, hw: 1.9 },
+    { t0: 0.6200, t1: 0.6370, lat: 0.0, hw: 2.6 },
+    { t0: 0.0450, t1: 0.0620, lat: -3.0, hw: 2.0 },
+    { t0: 0.0450, t1: 0.0620, lat: 3.0, hw: 2.0 },
   ],
-  boxRows: [0.050, 0.145, 0.250, 0.330, 0.420, 0.500, 0.590, 0.670, 0.810, 0.885],
-  hoardingZones: [[0, 0.09], [0.60, 0.74]],
+  boxRows: [0.075, 0.170, 0.250, 0.330, 0.410, 0.500, 0.630, 0.720, 0.810, 0.900],
+  hoardingZones: [[0, 0.10], [0.63, 0.80]],
 };
 
 // ===========================================================================

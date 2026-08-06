@@ -25,6 +25,8 @@ Four events:
 | **Summit Sprint** | Sprint · 2.2 km | One flying run over the mountain — hairpin switchbacks, a tunnel bored through the summit at 54 m, then a plunge back to a seafront drag |
 | **Vapor Canyon** | 3 laps · 1.75 km | Over, under and along the gorge: a descending tunnel dive, a river flat-out, a banked carousel cut into the wall, and a bridge back across the canyon |
 
+![The four circuits](docs/track-shapes.png)
+
 ![Summit Sprint — hairpin over the sea](docs/summit-sprint.png)
 
 Drift to charge mini-turbos (three tiers: cyan, hot pink, violet), grab item
