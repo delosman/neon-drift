@@ -1047,8 +1047,10 @@ boot().catch((err) => {
     `<pre style="color:#f66;padding:24px;font:13px ui-monospace">Boot failed:\n${err?.stack || err}</pre>`;
 });
 
-// Expose for the screenshot harness / debugging.
+// Expose for the screenshot harness / debugging. THREE rides along so a
+// harness diagnostic can raycast in-page without bundling its own copy.
 (window as any).__ctx = ctx;
+(window as any).__THREE = THREE;
 // tools/perf.mjs turns this off to measure the un-LODed field for a before/after.
 (window as any).__drawBudget = drawBudget;
 (window as any).__camRig = camera; // TEMP-PROBE

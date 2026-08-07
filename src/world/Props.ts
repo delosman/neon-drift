@@ -45,6 +45,18 @@ export const PAL = {
   skin: [0xf0c8a0, 0xd9a578, 0xa9713f, 0x6f4426, 0xf7d9bd],
 };
 
+/**
+ * Global placement veto, installed by Scenery once the track exists. Every
+ * InstSet placement is checked against it: on self-adjacent layouts (hairpin
+ * teeth, a dumbbell waist) "outboard of station A" can be ON THE ROAD of
+ * station B, and the per-station hint probes the dressers use cannot see
+ * that. Returns true when the placement is allowed. Sets whose name matches
+ * the exemption list (arches, bunting — things that legitimately span the
+ * carriageway) are never vetoed.
+ */
+export let placementGuard: ((x: number, y: number, z: number, setName: string) => boolean) | null = null;
+export function setPlacementGuard(g: typeof placementGuard) { placementGuard = g; }
+
 export type RNG = () => number;
 
 /** Deterministic 32-bit PRNG — the whole world must rebuild identically. */
@@ -2854,6 +2866,9 @@ export class InstSet {
   }
 
   add(m: THREE.Matrix4, o?: InstOpts) {
+    // The road-corridor veto. Position is the matrix translation; a vetoed
+    // instance simply never joins the set.
+    if (placementGuard && !placementGuard(m.elements[12], m.elements[13], m.elements[14], this.name)) return;
     this.mats.push(m.clone());
     if (o?.color) {
       this.useCol = true;

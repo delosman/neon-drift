@@ -37,6 +37,10 @@ const TRACK = arg('track', '');
 /** quality tier for the capture — 'high' is the art-critique standard; 'low'
  * sidesteps a headless-only postfx blow-out on some capture machines */
 const QUALITY = arg('quality', 'high');
+/** --diag: at shutter time, dump every mesh AABB that contains the camera or
+ * crosses the first 30 m of the view ray. For identifying WHAT a black mass in
+ * a capture actually is, by name, instead of guessing from the silhouette. */
+const DIAG = argv.includes('--diag');
 
 /**
  * Each shot positions the player, optionally overrides the camera, and names
@@ -214,10 +218,59 @@ async function capture(page, file) {
   // walking pace, or in the wrong section entirely, and read as rendering bugs.
   await page.evaluate(() => { window.__freeze = true; });
   try {
+    if (DIAG) {
+      const d = await sceneDiag(page);
+      console.log('  DIAG ' + JSON.stringify(d, null, 1).replace(/\n/g, '\n  '));
+    }
     return await captureAttempts(page, file);
   } finally {
     await page.evaluate(() => { window.__freeze = false; });
   }
+}
+
+/**
+ * Name the occluder. Casts real rays (THREE.Raycaster, via the __THREE debug
+ * export) from the camera: one down the view axis, one at the player kart, and
+ * a fan across the lower half of the frame where black masses have shown up.
+ * Reports the first few triangle hits per ray with mesh names and distances.
+ */
+async function sceneDiag(page) {
+  return page.evaluate(() => {
+    const ctx = window.__ctx, T = window.__THREE;
+    if (!ctx || !T) return { err: 'no __ctx/__THREE' };
+    const cam = ctx.camera;
+    cam.updateMatrixWorld(true);
+    const camPos = new T.Vector3().setFromMatrixPosition(cam.matrixWorld);
+    const fwd = new T.Vector3();
+    cam.getWorldDirection(fwd);
+    const ray = new T.Raycaster();
+    ray.far = 200;
+    const describe = (h) => ({
+      d: +h.distance.toFixed(2),
+      name: h.object.name || (h.object.parent && h.object.parent.name) || '(unnamed)',
+      inst: h.instanceId ?? -1,
+      mat: (h.object.material && (h.object.material.name || h.object.material.type)) || '?',
+      at: [h.point.x, h.point.y, h.point.z].map((v) => +v.toFixed(1)),
+    });
+    const cast = (dir) => {
+      ray.set(camPos, dir.normalize());
+      return ray.intersectObjects(ctx.scene.children, true).slice(0, 4).map(describe);
+    };
+    const rays = { fwd: cast(fwd.clone()) };
+    const k = ctx.race && ctx.race.karts && ctx.race.karts[0];
+    if (k) rays.toKart = cast(k.position.clone().addScaledVector(new T.Vector3(0, 1, 0), 0.6).sub(camPos));
+    // fan across the lower half of the frame: NDC x -0.6..0.6, y -0.5
+    for (let i = -1; i <= 1; i++) {
+      const ndc = new T.Vector3(i * 0.6, -0.5, 0.5).unproject(cam).sub(camPos);
+      rays['low' + (i + 1)] = cast(ndc);
+    }
+    return {
+      cam: [camPos.x, camPos.y, camPos.z].map((v) => +v.toFixed(1)),
+      kart: k ? [k.position.x, k.position.y, k.position.z].map((v) => +v.toFixed(1)) : null,
+      kartT: k ? +k.t.toFixed(3) : null,
+      rays,
+    };
+  });
 }
 
 async function captureAttempts(page, file) {

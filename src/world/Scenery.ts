@@ -21,6 +21,7 @@ import { Surface } from '../types';
 import { Water, type SeaField } from './Water';
 import { Foliage } from './Foliage';
 import { ACTIVE_TRACK } from './TrackDefs';
+import { setPlacementGuard } from './Props';
 import {
   GeoAccum,
   InstSet,
@@ -88,6 +89,7 @@ import {
 const _p = new THREE.Vector3();
 const _p2 = new THREE.Vector3();
 const _n = new THREE.Vector3();
+const _pg = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _scl = new THREE.Vector3();
@@ -321,6 +323,24 @@ export class Scenery implements System {
     this.mats.setEnv(ctx.envMap);
 
     this.surveyWorld();
+
+    // Road-corridor placement veto (see Props.placementGuard). A prop may
+    // stand no closer than half a metre outside the kerb's outer edge of ANY
+    // part of the circuit — the global probe is what catches "outboard of
+    // this station, on the road of that one". Exemptions: sets that span the
+    // road by design, and anything flying 3.5 m above the deck (arch beams,
+    // bunting strings, gulls).
+    const track = this.ctx.track;
+    const SPAN_OK = /banner|bunting|arch|gull|cable|garland/i;
+    setPlacementGuard((x, y, z, setName) => {
+      if (SPAN_OK.test(setName)) return true;
+      _pg.set(x, y, z);
+      const pr = track.probe(_pg, -1);
+      if (y > pr.y + 3.5) return true;
+      const half = track.sample(pr.t).halfWidth;
+      return Math.abs(pr.lateral) > half + 1.6 + 0.5;
+    });
+
     this.foliage = new Foliage(this.mats, this.u, this.rng);
 
     this.water = new Water(this.u);

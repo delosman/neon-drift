@@ -161,6 +161,7 @@ uniform mat4 prevViewProj;
 uniform mat4 invViewProj;
 uniform vec4 grade;   // x exposure, y S-curve amount, z saturation, w vignette (authored base)
 uniform vec4 lens;    // x aberration, y grain, z speed-line gain, w shutter
+${ACTIVE_TRACK.theme === 'negative' ? 'const vec3 STREAK_TINT = vec3(1.0);' : 'const vec3 STREAK_TINT = vec3(1.0, 0.972, 0.918);'}
 uniform vec3 rush;    // x radial blur amount, y gated speed intensity, z boost kick (0..1)
 uniform vec2 vig;     // x vignette amount (speed-driven), y inner edge (closes in with speed)
 uniform vec3 subject; // world-space centre of the player's kart
@@ -582,7 +583,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
     // tarmac, the cliff face) and keeps the brightest content — which is where
     // a clipped ray is most obvious and least useful — under the ceiling.
     float head = 1.0 - 0.50 * smoothstep(0.60, 1.00, lum);
-    c += (lines / (1.0 + lines * 1.2)) * head * vec3(1.0, 0.972, 0.918);
+    c += (lines / (1.0 + lines * 1.2)) * head * STREAK_TINT;
   }
 
   // Vignette AFTER the display transform, deliberately. Applied in linear it
@@ -1222,6 +1223,30 @@ export class PostFX {
         levels: 6,
       });
       this.bloom = bloom;
+
+      // Scrub non-finite pixels at the mouth of the mip chain. A single
+      // Inf-bright specular texel (the half-float buffer tops out at 65504;
+      // anything past that IS Inf) rides bloom's downsample into ever-larger
+      // mip texels, and ACES then maps Inf to NaN — which presents as a
+      // staircase of hard-edged BLACK rectangles covering half the frame
+      // (measured on Vapor Canyon's carousel, deterministic, every capture).
+      // The comparison is written so NaN fails it too: NaN < x is false, so
+      // both Inf and NaN take the zero branch. 4096 is far above any authored
+      // HDR value in this game (the sun disc is 13x) but low enough that six
+      // levels of downsampling cannot overflow a half-float accumulator.
+      const lm = bloom.luminanceMaterial;
+      const tap = 'vec4 texel=texture2D(inputBuffer,vUv);';
+      const scrubbed = lm.fragmentShader.replace(tap, tap +
+        'texel.rgb=(texel.r<65000.0&&texel.g<65000.0&&texel.b<65000.0)' +
+        '?clamp(texel.rgb,vec3(0.0),vec3(4096.0)):vec3(0.0);');
+      if (scrubbed === lm.fragmentShader) {
+        // The library changed its shader text: the scrub silently not applying
+        // would re-open the black-staircase bug, so make the miss loud.
+        console.warn('[postfx] bloom NaN scrub did not match luminance shader');
+      } else {
+        lm.fragmentShader = scrubbed;
+        lm.needsUpdate = true;
+      }
     }
 
     // --- one pass for both -------------------------------------------------
@@ -1382,7 +1407,11 @@ export class PostFX {
     // for a fraction of a second — that overshoot IS the event. The aberration
     // is still capped in TEXELS inside the shader (CA_MAX_TEXELS), so the
     // fringe cannot decorrelate the channels however hard this pushes.
-    lens.x = CA_REST + (CA_BOOST - CA_REST) * Math.min(1.35, drive + ignite * 0.55);
+    // The negative theme forbids the aberration entirely: R/B fringing is
+    // literally reintroducing colour into a monochrome frame.
+    lens.x = ACTIVE_TRACK.theme === 'negative'
+      ? 0
+      : CA_REST + (CA_BOOST - CA_REST) * Math.min(1.35, drive + ignite * 0.55);
     lens.z = STREAK_REST + (STREAK_BOOST - STREAK_REST) * Math.min(1.30, drive + ignite * 0.45);
     lens.w = shutter;
 

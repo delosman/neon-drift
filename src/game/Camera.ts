@@ -368,7 +368,10 @@ const ARM_FRAC_OUT = 0.22;
 
 const PROP_MAX_SPAN = 13;     // wider than this is architecture, not furniture
 const PROP_MAX_HEIGHT = 15;
-const PROP_MAX_COUNT = 2400;
+// 2400 filled up on the prop-dense gridline circuits BEFORE the sponsor
+// hoardings were traversed, so the chase camera happily parked inside a
+// billboard and half the frame went black. The registry is 24 bytes a box.
+const PROP_MAX_COUNT = 6000;
 const PROP_MAX_INSTANCES = 384;
 const PROP_BUILD_FRAMES = [0, 12, 40, 110, 300];
 /** Shortest the furniture sweep alone may leave the arm. Terrain and walls are
