@@ -19,7 +19,7 @@ import { Effects } from './fx/Effects';
 import { Items } from './game/Items';
 import { Race } from './game/Race';
 import { ChaseCamera } from './game/Camera';
-import { HUD } from './ui/HUD';
+import { HUD } from './ui/Hud';
 import { Audio } from './audio/Audio';
 
 const parent = document.getElementById('app')!;

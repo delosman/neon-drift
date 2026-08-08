@@ -2186,3 +2186,22 @@ html[data-touch][data-touch-hand="left"] .kr .kr-pos {
   .kr-roster { margin-top: 0.7vmin; }
   .kr-menu-list { margin-top: 0.7vmin; }
 }
+
+/* ===========================================================================
+   Negative Zone theme gate. The world renders monochrome by contract, and two
+   independent critic passes read every FRAME-FILLING coloured overlay — the
+   gold banked-charge rails, the warm boost wash, the tier-up wash, the item
+   flash — as a grading bug on that track ("stray hues on a monochrome theme").
+   The compact chips (position card, dial, minimap) keep their neon: colour
+   reserved for INSTRUMENTS is the theme's own rule. Only the overlays that
+   touch the frame edge go grey. `data-kr-theme` is stamped by Hud.init.
+   =========================================================================== */
+html[data-kr-theme='negative'] .kr-vig,
+html[data-kr-theme='negative'] .kr-boost,
+html[data-kr-theme='negative'] .kr-drift,
+html[data-kr-theme='negative'] .kr-charge,
+html[data-kr-theme='negative'] .kr-tierpop,
+html[data-kr-theme='negative'] .kr-flash,
+html[data-kr-theme='negative'] .kr-count-vig {
+  filter: grayscale(1);
+}

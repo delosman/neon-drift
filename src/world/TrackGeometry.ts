@@ -746,16 +746,21 @@ function kerbMaterial(lib: MatLib): THREE.Material {
 function injectTerrainMacro(mat: THREE.Material, amount = 1): void {
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vMacroWP;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vMacroWP;\nvarying vec3 vMacroN;')
       .replace(
         '#include <begin_vertex>',
-        '#include <begin_vertex>\nvMacroWP = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+        '#include <begin_vertex>\nvMacroWP = (modelMatrix * vec4(transformed, 1.0)).xyz;\n' +
+        // World-space normal for the strata gate below. objectNormal is in
+        // scope here (beginnormal_vertex runs before begin_vertex); terrain
+        // is never non-uniformly scaled, so mat3(modelMatrix) is safe.
+        'vMacroN = normalize(mat3(modelMatrix) * objectNormal);',
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 varying vec3 vMacroWP;
+varying vec3 vMacroN;
 float mcHash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
@@ -782,6 +787,22 @@ float mcFbm(vec2 p) {
   // change of light on the land rather than a change of exposure.
   diffuseColor.r *= 1.0 + tint * 0.22 * ${amount.toFixed(3)};
   diffuseColor.b *= 1.0 - tint * 0.20 * ${amount.toFixed(3)};
+  // STRATA. Elevation-keyed value beds that fade in as the face steepens, so
+  // a canyon wall reads as bedded rock while a meadow stays clean. This is
+  // the macro feature the xz-noise above cannot supply: every critic pass on
+  // the gorge tracks called the walls "one flat speckle at one scale". The
+  // band phase is jittered by the same fbm so the beds wander like real
+  // deposition instead of ruling the hillside into stripes; smoothstep pulls
+  // each bed edge tight enough to silhouette without aliasing.
+  float steep = 1.0 - smoothstep(0.45, 0.80, vMacroN.y);
+  if (steep > 0.003) {
+    float bed = sin(vMacroWP.y * 0.86 + mcFbm(vMacroWP.xz * 0.019) * 4.6);
+    float beds = smoothstep(-0.55, 0.55, bed) - 0.5;
+    diffuseColor.rgb *= 1.0 + beds * 0.34 * steep * ${amount.toFixed(3)};
+    // Alternate beds shift warm/cool slightly — two hues, not two exposures.
+    diffuseColor.r *= 1.0 + beds * 0.10 * steep * ${amount.toFixed(3)};
+    diffuseColor.b *= 1.0 - beds * 0.12 * steep * ${amount.toFixed(3)};
+  }
 }`,
       )
       .replace(

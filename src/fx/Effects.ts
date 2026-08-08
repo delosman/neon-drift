@@ -4191,7 +4191,19 @@ export class Effects implements System {
     fx.skidStrength = Math.min(1, fx.skidStrength + 0.34);
     // 0.55 m segments. The chord error against a drift radius of 15 m is under
     // 3 mm, and it halves how fast a pack fight can churn through the ring.
-    if (fx.skidL.distanceToSquared(this.skidLRef) < 0.3) return;
+    const d2 = fx.skidL.distanceToSquared(this.skidLRef);
+    if (d2 < 0.3) return;
+    // A respawn teleports the kart between two stamps, and a segment laid
+    // across that gap is a black streak the length of the shortcut — drawn
+    // through the air wherever the chord leaves the ground, which is how a
+    // "perfectly straight black line crossing the horizon" ended up in a
+    // critic frame. 3 m is beyond any legitimate one-frame travel (50 m/s at
+    // 20 Hz worst case is 2.5 m), so past it: rebase, don't stamp.
+    if (d2 > 9) {
+      fx.skidL.copy(this.skidLRef);
+      fx.skidR.copy(this.skidRRef);
+      return;
+    }
     const life = 13;
     // Wider and considerably darker than they were. At 0.30 m and a 0.30 grey
     // multiplier the mark was a faint smudge that vanished into a tarmac

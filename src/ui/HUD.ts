@@ -47,6 +47,7 @@ import { BASE_TOP_SPEED, ItemKind, RaceState, type Ctx, type IKart, type System 
 import { Minimap } from './Minimap';
 import { Menus } from './Menus';
 import { RACE_LAPS } from '../world/TrackLayout';
+import { ACTIVE_TRACK } from '../world/TrackDefs';
 import { ItemIconAtlas, ITEM_NAMES, ITEM_TINT, ROULETTE_ORDER } from './ItemIcons';
 import {
   Spring, TIER_COLORS, clamp, cssColor, damp, el, formatClock, formatDelta,
@@ -272,6 +273,11 @@ export class HUD implements System {
 
   init(ctx: Ctx) {
     const host = document.getElementById('ui') || document.body;
+    // Stamped on the root so ui.css can theme-gate rules. The negative theme
+    // keeps the compact chips neon but sends the FRAME-FILLING overlays
+    // (washes, rails, vignette) to grey — two independent critics read a
+    // coloured full-frame wash on the monochrome world as a grading bug.
+    document.documentElement.dataset.krTheme = ACTIVE_TRACK.theme ?? 'neon';
     this.root = el('div', 'kr', host);
 
     this.vig = el('div', 'kr-vig', this.root);

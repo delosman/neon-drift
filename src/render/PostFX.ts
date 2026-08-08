@@ -1198,7 +1198,14 @@ export class PostFX {
         // exact class of invisible degradation this round exists to remove.
         // 0.78 keeps the same population it was aiming at (just above sunlit
         // diffuse white) inside the range the buffer can represent.
-        luminanceThreshold: opts.ldr === true ? 0.78 : 1.55,
+        // The negative theme's horizon is near-white by design (SKY_HORIZON
+        // 0xf0f0f0), so the standard gate lets the ENTIRE sky band through and
+        // bloom welds it into a flat white hole that erased three item boxes
+        // in a critic frame. The higher gate keeps bloom for true speculars
+        // (chrome, sparks, boost) and hands the sky back its gradient.
+        luminanceThreshold: ACTIVE_TRACK.theme === 'negative'
+          ? (opts.ldr === true ? 0.92 : 2.30)
+          : (opts.ldr === true ? 0.78 : 1.55),
         luminanceSmoothing: 0.32,
         mipmapBlur: true,
         intensity: 0.88,
@@ -1502,6 +1509,12 @@ export class PostFX {
       // release frame a halo on the flame and the shockwave and then gets out
       // of the way.
       this.bloom.intensity = 0.88 + 0.06 * fast + 0.14 * kick + 0.18 * ignite;
+      // The negative theme's high-contrast grade pushes the sun-facing road
+      // sheen close to paper white BEFORE bloom; at full strength the glow
+      // welds that sheen into a flat hole that erased item boxes in a critic
+      // frame. Sparks and chrome still clear the (raised) threshold and read;
+      // the veil is what the trim removes.
+      if (ACTIVE_TRACK.theme === 'negative') this.bloom.intensity *= 0.55;
     }
 
     const player = ctx.race?.player;
