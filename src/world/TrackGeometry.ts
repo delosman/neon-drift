@@ -45,11 +45,23 @@ const C_TARMAC = new THREE.Color('#42425e');
 const C_RACE = new THREE.Color('#373752');
 const C_KERB_R = new THREE.Color(ACTIVE_TRACK.theme === 'negative' ? '#141414' : '#ff2d95');
 const C_KERB_W = new THREE.Color('#e6f8ff');
-const C_SAND = new THREE.Color('#d9b9de');
+/**
+ * Earth tones fork by KIT. The coastal table's violet sand / mauve dirt is the
+ * beach-resort identity and stays. On the gridline (canyon/mountain) circuits
+ * the same table collapsed the whole frame into one hue: rock walls, sand
+ * shoulders and mountains were MADE OF the sky's pink, and the critic read it
+ * as "everything got globally tinted". These are desaturated warm neutrals at
+ * the SAME VALUE as the entries they replace (every wear multiplier below was
+ * tuned against those luminances) — the dusk still lands on them through the
+ * pink sun, the violet ambient and the sky reflection, which is the point:
+ * lit by pink, not made of pink.
+ */
+const EARTH_NEUTRAL = ACTIVE_TRACK.kit === 'gridline';
+const C_SAND = new THREE.Color(EARTH_NEUTRAL ? '#d3c4b2' : '#d9b9de');
 const C_GRASS = new THREE.Color('#2f9c85');
 const C_GRASS_T = new THREE.Color('#3fbda0');
-const C_DIRT = new THREE.Color('#7d6394');
-const C_STONE = new THREE.Color('#8f86b0');
+const C_DIRT = new THREE.Color(EARTH_NEUTRAL ? '#84756a' : '#7d6394');
+const C_STONE = new THREE.Color(EARTH_NEUTRAL ? '#98918a' : '#8f86b0');
 const C_GRIME = new THREE.Color('#565170');
 const C_PAINT = new THREE.Color('#e6f8ff');
 
@@ -69,8 +81,11 @@ const C_PAINT = new THREE.Color('#e6f8ff');
  * of this, and the two must not stack into a black stripe.
  */
 const C_RACE_MUL = new THREE.Color(0.60, 0.60, 0.80);
-/** violet dusting where the beach blows sand across the outer lane */
-const C_SAND_MUL = new THREE.Color(1.22, 1.08, 1.24);
+/** dusting where wind blows sand across the outer lane — violet on the
+ *  coastal kit, warm bone on gridline (see the earth-tone fork above) */
+const C_SAND_MUL = EARTH_NEUTRAL
+  ? new THREE.Color(1.20, 1.14, 1.06)
+  : new THREE.Color(1.22, 1.08, 1.24);
 /** pale silt and grit washed into the gutter, in patches, everywhere */
 const C_DUST_MUL = new THREE.Color(1.16, 1.12, 1.20);
 /**

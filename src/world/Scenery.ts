@@ -719,15 +719,31 @@ export class Scenery implements System {
     return sm;
   }
 
-  /** Ground height under `p`; writes the ground normal into `outN` if given. */
+  /**
+   * Ground height under `p`; writes the ground normal into `outN` if given.
+   *
+   * GLOBAL probe (hint -1), deliberately, and the hint parameter is kept only
+   * for call-site symmetry. The hinted search accepts its own leg's station
+   * whenever the point is within 160 m of it — which on a self-adjacent
+   * layout (Summit's switchback ladder) is exactly the failure: a dresser
+   * probing 70 m outboard of the lower ramp got the UPPER ramp's height,
+   * settled foliage onto that phantom surface, and the critic frame showed a
+   * dozen trees hanging in the sky. The rendered terrain mesh is built from
+   * the un-hinted nearest station (groundAt), so placement must select
+   * stations the same way or the two disagree. tools/float-audit.mjs counts
+   * offenders per set; dresser-time only, so the global search is affordable.
+   */
   private groundY(p: THREE.Vector3, t: number, outN?: THREE.Vector3): number {
-    const pr = this.ctx.track.probe(p, t);
+    void t;
+    const pr = this.ctx.track.probe(p, -1);
     if (outN) outN.copy(pr.normal).normalize();
     return pr.y;
   }
 
+  /** Global probe for the same reason as groundY above. */
   private surfaceAt(p: THREE.Vector3, t: number): Surface {
-    return this.ctx.track.probe(p, t).surface;
+    void t;
+    return this.ctx.track.probe(p, -1).surface;
   }
 
   /** Is the point at (t, lat) open water? */
@@ -736,7 +752,9 @@ export class Scenery implements System {
     if (Math.sign(lat) !== this.seaSide(t)) return false;
     if (this.flatWorld) return Math.abs(lat) > sm.halfWidth + 16;
     this.at(t, lat, _p2, sm);
-    const pr = this.ctx.track.probe(_p2, t);
+    // Global probe — see groundY: a hinted read across a self-adjacent layout
+    // answers for the wrong leg.
+    const pr = this.ctx.track.probe(_p2, -1);
     return pr.surface === Surface.Water || pr.y < this.seaLevel + 0.35;
   }
 
