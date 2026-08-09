@@ -326,20 +326,58 @@ export class Scenery implements System {
 
     // Road-corridor placement veto (see Props.placementGuard). A prop may
     // stand no closer than half a metre outside the kerb's outer edge of ANY
-    // part of the circuit — the global probe is what catches "outboard of
-    // this station, on the road of that one". Exemptions: sets that span the
-    // road by design, and anything flying 3.5 m above the deck (arch beams,
-    // bunting strings, gulls).
+    // part of the circuit. Exemptions: sets that span the road by design, and
+    // anything more than 3 m above the deck (arch beams, bunting, gulls).
+    //
+    // The test is a 3D corridor sweep, NOT a single global probe, and the
+    // difference shipped as a bug: probe(-1) answers for the XZ-NEAREST
+    // station, and on a stacked switchback a point sitting ON the upper ramp
+    // is equally XZ-near to both legs. When the coin landed on the lower leg,
+    // the point measured 10 m "above" that road, the old elevation bypass
+    // called it a banner, and a scale-4 debris boulder parked itself in the
+    // middle of the upper carriageway — where it then got baked into the
+    // static merge, invisible to every instanced-mesh audit. Sweeping every
+    // station within a grid cell and testing |Δy| < 3 catches every leg the
+    // point is actually level with, whichever is nearer in XZ.
+    // tools/road-audit.mjs runs the same test post-build (it can only see
+    // sets that stay instanced — this guard is what protects the merged ones).
     const track = this.ctx.track;
     const SPAN_OK = /banner|bunting|arch|gull|cable|garland/i;
-    setPlacementGuard((x, y, z, setName) => {
-      if (SPAN_OK.test(setName)) return true;
-      _pg.set(x, y, z);
-      const pr = track.probe(_pg, -1);
-      if (y > pr.y + 3.5) return true;
-      const half = track.sample(pr.t).halfWidth;
-      return Math.abs(pr.lateral) > half + 1.6 + 0.5;
-    });
+    {
+      const CELL = 16;
+      const grid = new Map<string, number[]>();
+      const st: number[] = [];
+      const L = track.length;
+      for (let d = 0; d < L; d += 1) {
+        const s = track.sampleByDistance(d);
+        const i = st.length;
+        st.push(s.pos.x, s.pos.y, s.pos.z, s.halfWidth);
+        const key = `${Math.floor(s.pos.x / CELL)},${Math.floor(s.pos.z / CELL)}`;
+        let b = grid.get(key);
+        if (!b) grid.set(key, (b = []));
+        b.push(i);
+      }
+      setPlacementGuard((x, y, z, setName) => {
+        if (SPAN_OK.test(setName)) return true;
+        const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const b = grid.get(`${cx + dx},${cz + dz}`);
+            if (!b) continue;
+            for (const i of b) {
+              const dy = y - st[i + 1];
+              // Below the deck is a bridge underpass; 3 m above is a span.
+              if (dy < -1.0 || dy > 3.0) continue;
+              const ex = x - st[i], ez = z - st[i + 2];
+              // Stations are 1 m apart, so point-to-point distance is within
+              // half a metre of true lateral distance; the pad absorbs it.
+              if (Math.hypot(ex, ez) < st[i + 3] + 2.1) return false;
+            }
+          }
+        }
+        return true;
+      });
+    }
 
     this.foliage = new Foliage(this.mats, this.u, this.rng);
 
@@ -5384,15 +5422,22 @@ export class Scenery implements System {
       'sponsor', 'aframePanel', 'wallsignPanel',
     ].filter((k) => this.sets[k] !== undefined);
 
-    const { merged, kept } = mergeStaticSets(
-      batchable.map((k) => this.sets[k]),
-      (name) => !noCast.has(name),
-    );
-    for (const mesh of merged) this.group.add(mesh);
-    for (const k of batchable) delete this.sets[k];
-    // Anything the merger refused (a set that turned out to be animated after
-    // all) goes back through the instanced path rather than being dropped.
-    for (const set of kept) this.sets[set.name] = set;
+    // `?debug=nomerge` keeps every set instanced so per-instance audits
+    // (tools/road-audit.mjs) can see them — the merge bakes positions away,
+    // which is exactly how a mis-guarded boulder on the carriageway became
+    // invisible to every instrument. Costs draw calls; debugging only.
+    const NO_MERGE = /\bnomerge\b/.test(new URLSearchParams(location.search).get('debug') || '');
+    if (!NO_MERGE) {
+      const { merged, kept } = mergeStaticSets(
+        batchable.map((k) => this.sets[k]),
+        (name) => !noCast.has(name),
+      );
+      for (const mesh of merged) this.group.add(mesh);
+      for (const k of batchable) delete this.sets[k];
+      // Anything the merger refused (a set that turned out to be animated after
+      // all) goes back through the instanced path rather than being dropped.
+      for (const set of kept) this.sets[set.name] = set;
+    }
 
     for (const k of Object.keys(this.sets)) {
       const cast = !noCast.has(k);
