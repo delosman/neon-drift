@@ -5234,21 +5234,55 @@ export class Scenery implements System {
 
     // --- a hamlet on the slope: four to seven blocks under one roof colour
     if (!this.midgroundOk(t, lat, s, _p)) return;
+    // The hamlet is Mediterranean-COASTAL vocabulary, and it was the last of
+    // the user's "giant blocks": midgroundOk tests the CLUSTER CENTRE, but
+    // the blocks spread up to ±24 m from it — on a stacked switchback the far
+    // blocks of a legally-anchored hamlet landed against the next ramp's
+    // kerb, unsettled and unchecked. A mountain sprint gets a rock knoll
+    // instead (guarded, settled, on-theme); the coastal hamlet survives with
+    // every BLOCK settled and corridor-checked individually.
+    if (ACTIVE_TRACK.kit !== 'coastal') {
+      const m = 3 + ((rng() * 3) | 0);
+      for (let k = 0; k < m; k++) {
+        _p2.set(_p.x + (rng() - 0.5) * 14, _p.y, _p.z + (rng() - 0.5) * 14);
+        this.settle(_p2, t);
+        if (this.blocked(_p2, 1.5)) continue;
+        this.sets['debris' + ((rng() * 3) | 0)].add(
+          trs(_p2.x, _p2.y, _p2.z, rng() * 6.28, 2.0 + rng() * 2.2),
+          { color: _col.set(0xbfae95).clone(), lod: 380 });
+        this.dropShadow(_p2, 1.8, t, 0.55);
+      }
+      for (let k = 0; k < 3; k++) {
+        _p2.set(_p.x + (rng() - 0.5) * 18, _p.y, _p.z + (rng() - 0.5) * 18);
+        this.settle(_p2, t);
+        if (this.blocked(_p2, 2)) continue;
+        this.foliage.pine(_p2.clone(), 1.0 + rng() * 0.5, rng() * 6.28, t);
+      }
+      this.claim(_p, 9);
+      return;
+    }
     const inward = Math.atan2(-s.binormal.x * side, -s.binormal.z * side);
     const roof = _col.set(0xb5643f).clone();
     const n = 4 + ((rng() * 4) | 0);
-    const base = trs(_p.x, _p.y, _p.z, inward + (rng() - 0.5) * 0.6);
+    const rowYaw = inward + (rng() - 0.5) * 0.6;
+    const base = trs(_p.x, _p.y, _p.z, rowYaw);
     for (let k = 0; k < n; k++) {
       const bw = 5 + rng() * 4;
       const bh = 4.5 + rng() * 4;
       const bx = (k / Math.max(1, n - 1) - 0.5) * (n * 7);
       const bz = (rng() - 0.5) * 9;
-      const by = Math.abs(bx) * 0.09 * (rng() < 0.5 ? 1 : -1);
+      // The block's own ground and its own corridor clearance — never the
+      // cluster centre's.
+      _m4.multiplyMatrices(base, trs(bx, 0, bz, 0));
+      _p2.set(_m4.elements[12], _p.y, _m4.elements[14]);
+      this.settle(_p2, t);
+      if (!this.roadClear(_p2.x, _p2.y, _p2.z, bw * 0.7)) continue;
       const wall = _col.set(pick(rng, PAL.pastels)).clone();
-      this.acc.wall.add(bevelBox(bw, bh, bw * 0.85, 0.07, 0.5), _m4.multiplyMatrices(base, trs(bx, by + bh / 2, bz, (rng() - 0.5) * 0.35)).clone(), wall, (_x, y) =>
+      const bm = trs(_p2.x, _p2.y, _p2.z, rowYaw + (rng() - 0.5) * 0.35);
+      this.acc.wall.add(bevelBox(bw, bh, bw * 0.85, 0.07, 0.5), _m4.multiplyMatrices(bm, trs(0, bh / 2, 0, 0)).clone(), wall, (_x, y) =>
         lerp(0.55, 1, smoothstep(-bh * 0.5, -bh * 0.15, y))
       );
-      this.acc.roof.add(bevelBox(bw + 0.9, 0.55, bw * 0.95, 0.06, 0.8), _m4.multiplyMatrices(base, trs(bx, by + bh + 0.28, bz, (rng() - 0.5) * 0.35)).clone(), roof);
+      this.acc.roof.add(bevelBox(bw + 0.9, 0.55, bw * 0.95, 0.06, 0.8), _m4.multiplyMatrices(bm, trs(0, bh + 0.28, 0, 0)).clone(), roof);
     }
     this.claim(_p, n * 3.5);
     for (let k = 0; k < 3; k++) {

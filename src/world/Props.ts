@@ -2873,7 +2873,27 @@ export class InstSet {
   add(m: THREE.Matrix4, o?: InstOpts) {
     // The road-corridor veto. Position is the matrix translation; a vetoed
     // instance simply never joins the set.
-    if (placementGuard && !placementGuard(m.elements[12], m.elements[13], m.elements[14], this.name)) return;
+    if (placementGuard) {
+      const x = m.elements[12], y = m.elements[13], z = m.elements[14];
+      if (!placementGuard(x, y, z, this.name)) return;
+      // Big bodies get their EXTENT tested, not just their origin: a debris
+      // boulder scaled 4x reaches ~5 m past its anchor, and one of them
+      // overhung the Summit carriageway with a legally-placed origin. The
+      // radius comes from the geometry's own bounds times the matrix scale;
+      // small props (the overwhelming majority) skip the extra tests.
+      if (!this.geo.boundingBox) this.geo.computeBoundingBox();
+      const bb = this.geo.boundingBox;
+      if (bb) {
+        const sx = Math.hypot(m.elements[0], m.elements[1], m.elements[2]);
+        const sz = Math.hypot(m.elements[8], m.elements[9], m.elements[10]);
+        const r = Math.max(bb.max.x, -bb.min.x, bb.max.z, -bb.min.z) * Math.max(sx, sz);
+        if (r > 1.5) {
+          for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r]] as const) {
+            if (!placementGuard(x + dx, y, z + dz, this.name)) return;
+          }
+        }
+      }
+    }
     this.mats.push(m.clone());
     if (o?.color) {
       this.useCol = true;

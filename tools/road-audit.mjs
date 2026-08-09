@@ -23,6 +23,11 @@ const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
 const TRACK = arg('track', 'summit-sprint');
 const PAD = parseFloat(arg('pad', '1.2'));
+// HIGH by default, and this is load-bearing: dresser walk spacing scales
+// with the tier's foliage density, which shifts every walk index and
+// therefore every hash-picked kit decision downstream — a Low-tier audit
+// validates a DIFFERENT WORLD LAYOUT than the one a High-tier player races.
+const QUALITY = arg('quality', 'high');
 
 const server = await startVite(5173);
 const browser = await puppeteer.launch({
@@ -36,7 +41,7 @@ try {
   // nomerge keeps static sets instanced so this audit can see every instance
   // — merged bakes are opaque, and merged bakes are where the last on-road
   // boulder hid.
-  await page.goto(`http://127.0.0.1:5173/?track=${TRACK}&quality=low&scaler=off&debug=nomerge`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://127.0.0.1:5173/?track=${TRACK}&quality=${QUALITY}&scaler=off&debug=nomerge`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction('window.__gameReady === true', { timeout: 90000 });
 
   const report = await page.evaluate((pad) => {
@@ -105,11 +110,28 @@ try {
       if (INFRA.has(name) || name.startsWith('fx-') || name.startsWith('track-')) return;
       const pos = o.geometry.getAttribute('position');
       if (!pos) return;
-      // every 5th vertex: a 3 m wall face still lands dozens of samples
-      for (let i = 0; i < pos.count; i += 5) {
-        p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
-        if (!onRoad(p.x, p.y, p.z)) continue;
-        hit('MESH ' + name, p.x, p.y, p.z);
+      // TRIANGLES, not vertices. A bevelBox wall slab carries vertices only
+      // at its corners, so a slab can span the whole carriageway while every
+      // vertex sits outside the test window — which is exactly how the last
+      // audit run declared a haunted road clean. Per triangle: the three
+      // corners, the three edge midpoints and the centroid; any triangle
+      // crossing an 8-16 m corridor lands at least one of those seven inside.
+      const idx = o.geometry.getIndex();
+      const triCount = (idx ? idx.count : pos.count) / 3;
+      const va = new T.Vector3(), vb = new T.Vector3(), vc = new T.Vector3(), q = new T.Vector3();
+      const test = (x, y, z) => { if (onRoad(x, y, z)) { hit('MESH ' + name, x, y, z); return true; } return false; };
+      for (let f = 0; f < triCount; f++) {
+        const a = idx ? idx.getX(f * 3) : f * 3;
+        const b = idx ? idx.getX(f * 3 + 1) : f * 3 + 1;
+        const c = idx ? idx.getX(f * 3 + 2) : f * 3 + 2;
+        va.set(pos.getX(a), pos.getY(a), pos.getZ(a)).applyMatrix4(o.matrixWorld);
+        vb.set(pos.getX(b), pos.getY(b), pos.getZ(b)).applyMatrix4(o.matrixWorld);
+        vc.set(pos.getX(c), pos.getY(c), pos.getZ(c)).applyMatrix4(o.matrixWorld);
+        if (test(va.x, va.y, va.z) || test(vb.x, vb.y, vb.z) || test(vc.x, vc.y, vc.z)) continue;
+        q.lerpVectors(va, vb, 0.5); if (test(q.x, q.y, q.z)) continue;
+        q.lerpVectors(vb, vc, 0.5); if (test(q.x, q.y, q.z)) continue;
+        q.lerpVectors(vc, va, 0.5); if (test(q.x, q.y, q.z)) continue;
+        q.copy(va).add(vb).add(vc).multiplyScalar(1 / 3); test(q.x, q.y, q.z);
       }
     });
     return out;
