@@ -299,6 +299,18 @@ export class Scenery implements System {
   private rng: RNG = mulberry32(1);
 
   private ctx!: Ctx;
+  /**
+   * Road corridor as data: centreline stations every metre in a 16 m spatial
+   * hash. Built in init, consumed by the placement guard AND by `roadClear` —
+   * which exists because the guard only sees InstSet placements, and the two
+   * classes of prop that ended up ON the Summit carriageway (field barns,
+   * dry-stone walls) are ACCUMULATOR geometry with bodies metres wide: their
+   * single-point anchor checks passed while the built mass hung over the
+   * road. Dressers placing anything with a footprint call roadClear with the
+   * footprint's radius.
+   */
+  private readonly roadGrid = new Map<string, number[]>();
+  private readonly roadSt: number[] = [];
   private seaLevel = 0;
   private flatWorld = false;
   private seaSideLUT = new Float32Array(128);
@@ -345,37 +357,21 @@ export class Scenery implements System {
     const SPAN_OK = /banner|bunting|arch|gull|cable|garland/i;
     {
       const CELL = 16;
-      const grid = new Map<string, number[]>();
-      const st: number[] = [];
+      this.roadGrid.clear();
+      this.roadSt.length = 0;
       const L = track.length;
       for (let d = 0; d < L; d += 1) {
         const s = track.sampleByDistance(d);
-        const i = st.length;
-        st.push(s.pos.x, s.pos.y, s.pos.z, s.halfWidth);
+        const i = this.roadSt.length;
+        this.roadSt.push(s.pos.x, s.pos.y, s.pos.z, s.halfWidth);
         const key = `${Math.floor(s.pos.x / CELL)},${Math.floor(s.pos.z / CELL)}`;
-        let b = grid.get(key);
-        if (!b) grid.set(key, (b = []));
+        let b = this.roadGrid.get(key);
+        if (!b) this.roadGrid.set(key, (b = []));
         b.push(i);
       }
       setPlacementGuard((x, y, z, setName) => {
         if (SPAN_OK.test(setName)) return true;
-        const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
-        for (let dz = -1; dz <= 1; dz++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const b = grid.get(`${cx + dx},${cz + dz}`);
-            if (!b) continue;
-            for (const i of b) {
-              const dy = y - st[i + 1];
-              // Below the deck is a bridge underpass; 3 m above is a span.
-              if (dy < -1.0 || dy > 3.0) continue;
-              const ex = x - st[i], ez = z - st[i + 2];
-              // Stations are 1 m apart, so point-to-point distance is within
-              // half a metre of true lateral distance; the pad absorbs it.
-              if (Math.hypot(ex, ez) < st[i + 3] + 2.1) return false;
-            }
-          }
-        }
-        return true;
+        return this.roadClear(x, y, z, 0);
       });
     }
 
@@ -759,6 +755,35 @@ export class Scenery implements System {
     const sm = s ?? this.ctx.track.sample(t);
     out.copy(sm.pos).addScaledVector(sm.binormal, lat);
     return sm;
+  }
+
+  /**
+   * Is a footprint of radius `pad` centred at (x,z), grounded at height y,
+   * clear of EVERY leg of the carriageway it is level with? The 3D corridor
+   * test the placement guard runs, with the caller's own body radius on top
+   * of the standard 2.1 m clearance. Below-deck (< -1 m) and overhead
+   * (> +3 m) stations don't count — underpasses and spans are legal.
+   */
+  private roadClear(x: number, y: number, z: number, pad: number): boolean {
+    const CELL = 16;
+    const st = this.roadSt;
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    const reach = Math.ceil((pad + 2.1) / CELL) + 1;
+    for (let dz = -reach; dz <= reach; dz++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const b = this.roadGrid.get(`${cx + dx},${cz + dz}`);
+        if (!b) continue;
+        for (const i of b) {
+          const dy = y - st[i + 1];
+          if (dy < -1.0 || dy > 3.0) continue;
+          const ex = x - st[i], ez = z - st[i + 2];
+          // Stations are 1 m apart, so point-to-point distance is within half
+          // a metre of true lateral distance; the clearance absorbs it.
+          if (Math.hypot(ex, ez) < st[i + 3] + 2.1 + pad) return false;
+        }
+      }
+    }
+    return true;
   }
 
   /**
@@ -2821,7 +2846,9 @@ export class Scenery implements System {
             color: _col.set(pick(rng, [0xe0453f, 0x4fc3ff, 0xff9d2e, 0xf2ece0, 0x2f6ba0])).clone(),
             lod: 260,
           });
-          if (k % 2 === 0) {
+          // Parasols are beach furniture; on the gridline circuits the fence
+          // and bunting carry the row alone.
+          if (k % 2 === 0 && ACTIVE_TRACK.kit === 'coastal') {
             _p.set(_p2.x + s.binormal.x * open * 6, _p2.y, _p2.z + s.binormal.z * open * 6);
             this.settle(_p, t);
             if (_p.y > this.seaLevel + 0.4) this.parasol(_p, t, rng);
@@ -2831,8 +2858,18 @@ export class Scenery implements System {
         // fishing shack / field barn: one gable, one lean-to, two crates
         const w = 5.5 + rng() * 3;
         const h = 3.4 + rng() * 1.6;
+        // The BODY test, not just the anchor. This barn is accumulator
+        // geometry — it never passes through the InstSet placement guard —
+        // and on a stacked switchback a legally-anchored barn hung its walls
+        // over the next ramp's carriageway. The user's screenshot, exactly.
+        if (!this.roadClear(_p.x, _p.y, _p.z, w * 0.7)) return;
+        // Coastal reads pastel-stucco holiday; a mountain sprint reads
+        // weathered timber. Same mass, different paint.
+        const facade = ACTIVE_TRACK.kit === 'coastal'
+          ? pick(rng, PAL.pastels)
+          : pick(rng, [0xd9cbb2, 0xcfc0a6, 0xc4b29a, 0xb8a68d]);
         const base = trs(_p.x, _p.y, _p.z, inward + (rng() - 0.5) * 0.5);
-        this.acc.wall.add(bevelBox(w, h, w * 0.8, 0.06, 0.4), _m4.multiplyMatrices(base, trs(0, h / 2, 0, 0)).clone(), _col.set(pick(rng, PAL.pastels)).clone(), (_x, y) =>
+        this.acc.wall.add(bevelBox(w, h, w * 0.8, 0.06, 0.4), _m4.multiplyMatrices(base, trs(0, h / 2, 0, 0)).clone(), _col.set(facade).clone(), (_x, y) =>
           lerp(0.55, 1, smoothstep(-h * 0.5, -h * 0.1, y))
         );
         this.acc.roof.add(bevelBox(w + 0.8, 0.3, w * 0.95, 0.05, 0.7), _m4.multiplyMatrices(base, trs(0, h + 0.15, 0, 0, 1, 1, 1, 0.22)).clone(), new THREE.Color(0xb5643f));
@@ -3281,8 +3318,27 @@ export class Scenery implements System {
       const ss = this.ctx.track.sample(tt);
       this.at(tt, lat, _p2, ss);
       this.settle(_p2, tt);
+      // Accumulator geometry: the InstSet guard never sees it, so each
+      // segment carries its own corridor check — a run that started legally
+      // could march segment by segment straight onto the next ramp of a
+      // stacked switchback, and did.
+      if (!this.roadClear(_p2.x, _p2.y, _p2.z, 1.8)) continue;
+      // Hug the slope. A 3.3 m box settled at its CENTRE floats both ends on
+      // a cross-slope — the "hovering brick blocks" in the user's screenshot.
+      // Settle both ends along the wall's own axis, take the LOWER, and skip
+      // where the drop across one segment is more than a wall's height: real
+      // dry stone follows a contour or it isn't built there.
+      const ex = Math.sin(yaw0) * 1.55, ez = Math.cos(yaw0) * 1.55;
+      _p.set(_p2.x + ex, _p2.y, _p2.z + ez);
+      this.settle(_p, tt);
+      const y0 = _p.y;
+      _p.set(_p2.x - ex, _p2.y, _p2.z - ez);
+      this.settle(_p, tt);
+      const y1 = _p.y;
+      if (Math.abs(y0 - y1) > 1.1) continue;
+      const yBase = Math.min(_p2.y, y0, y1);
       const h = 0.85 + rng() * 0.45;
-      this.acc.stone.add(bevelBox(0.55, h, 3.3, 0.05, 0.75), trs(_p2.x, _p2.y + h / 2 - 0.15, _p2.z, yaw0 + (rng() - 0.5) * 0.1), new THREE.Color(0xcfc0a6), (_x, y) => lerp(0.45, 1, smoothstep(-h / 2, 0, y)));
+      this.acc.stone.add(bevelBox(0.55, h, 3.3, 0.05, 0.75), trs(_p2.x, yBase + h / 2 - 0.15, _p2.z, yaw0 + (rng() - 0.5) * 0.1), new THREE.Color(0xcfc0a6), (_x, y) => lerp(0.45, 1, smoothstep(-h / 2, 0, y)));
     }
   }
 

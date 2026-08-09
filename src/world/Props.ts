@@ -16,6 +16,7 @@
  */
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
+import { ACTIVE_TRACK } from './TrackDefs';
 import { getMaterials } from '../render/Materials';
 
 // ---------------------------------------------------------------------------
@@ -811,14 +812,18 @@ export class TexLib {
       g.textBaseline = 'middle';
       g.letterSpacing = '6px';
       g.fillText('NITRO  ·  LAZERWAX  ·  BOOST CO.  ·  VHS FM', size / 2, hh * 0.9);
-      // course name
+      // Course name — the ACTIVE course. This was the literal 'SUNSET BAY'
+      // from before the track system existed, so every circuit's start gate
+      // welcomed racers to a beach it wasn't at. Font scales down for the
+      // longer names so the print never outgrows the chequer flashes.
+      const course = ACTIVE_TRACK.name.toUpperCase();
       g.fillStyle = '#f2ece0';
-      g.font = `900 ${hh * 0.42}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      g.font = `900 ${hh * Math.min(0.42, (0.42 * 11) / Math.max(1, course.length))}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
       g.letterSpacing = '10px';
       g.strokeStyle = 'rgba(60,20,16,0.55)';
       g.lineWidth = 7;
-      g.strokeText('SUNSET BAY', size / 2, hh * 0.4);
-      g.fillText('SUNSET BAY', size / 2, hh * 0.4);
+      g.strokeText(course, size / 2, hh * 0.4);
+      g.fillText(course, size / 2, hh * 0.4);
       // the rest of the sheet is plain cloth for the fold-over
       g.fillStyle = '#c8382f';
       g.fillRect(0, hh, size, size - hh);
