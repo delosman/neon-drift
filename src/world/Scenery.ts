@@ -3644,17 +3644,28 @@ export class Scenery implements System {
     // shader (0,0,0,1). Every non-hero arch was therefore sampling one texel of
     // the fabric atlas and rendering as a flat colour bar. Now that the sheet is
     // 2.8 m deep instead of 1.05 m that would be very visible.
-    const banner = new THREE.Mesh(g.banner, this.mats.banner);
-    banner.name = 'banner-cloth';
-    banner.applyMatrix4(m);
-    banner.castShadow = true;
     const n = g.banner.getAttribute('position').count;
     const wind = new Float32Array(n * 4);
     for (let i = 0; i < n; i++) wind[i * 4] = t * 31;
     // A single mesh still needs the attribute the cloth patch reads.
     g.banner.setAttribute('aWind', new THREE.BufferAttribute(wind, 4));
     g.banner.setAttribute('aUv', new THREE.BufferAttribute(new Float32Array(n * 4).fill(0).map((_, i) => (i % 4 < 2 ? 0.25 : i % 4 === 2 ? 0.75 : 0.0)), 4));
-    this.group.add(banner);
+    // TWO sheets, back to back. The plane is single-sided and hung on the +Z
+    // face of the truss, so approaching the arch from the other direction —
+    // or looking down on it, where the sheet is edge-on — showed bare
+    // scaffolding. The clone is rotated half a turn in the arch's own frame:
+    // same print, readable from the far side, and the pair sandwiches the
+    // truss so there is a face toward every camera. (DoubleSide on the shared
+    // banner material would mirror the print on the back and z-fight nothing
+    // but itself; two meshes are cheaper to reason about and cull normally.)
+    for (const face of [0, Math.PI]) {
+      const geo = face === 0 ? g.banner : g.banner.clone();
+      const sheet = new THREE.Mesh(geo, this.mats.banner);
+      sheet.name = 'banner-cloth';
+      sheet.applyMatrix4(face === 0 ? m : _m4.copy(m).multiply(new THREE.Matrix4().makeRotationY(face)));
+      sheet.castShadow = face === 0;
+      this.group.add(sheet);
+    }
     for (const sx of [-1, 1]) {
       this.at(t, sx * (span / 2), _p2, s);
       this.settle(_p2, t);

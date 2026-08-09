@@ -5081,6 +5081,33 @@ export function bannerArchGeo(span: number, height: number): { struct: THREE.Buf
     acc.add(bevelBox(0.14, 1.34, 0.34, 0.03, 2.4), trs(x, height + 0.85, 0, 0, 1, 1, 1, 0, (i % 2 ? 1 : -1) * 0.62), new THREE.Color(0.92, 0.92, 0.92));
   }
   acc.add(bevelBox(span + 1.2, 0.2, 0.4, 0.03, 2), trs(0, height + 2.2, 0, 0), new THREE.Color(0.9, 0.9, 0.9));
+  // ------------------------------------------------------------------------
+  //  THE GATE MUST READ FROM ABOVE AND BEHIND, NOT JUST FROM THE SHEET SIDE.
+  // ------------------------------------------------------------------------
+  //  The wide vantage sits high, where a hanging sheet is edge-on and all
+  //  that is left of the arch is bare truss — two critics called it
+  //  "unfinished scaffolding that never got its payload". A race gate solves
+  //  this with paint, and so does this one:
+  //    · a candy-striped ROOF PLATE laid on the top chord — alternating
+  //      kerb-pink/white segments, the same language as the kerbs, so from a
+  //      high camera the beam reads as a designed gate roof;
+  //    · three pink WRAP BANDS on each upright, so the legs stop reading as
+  //      raw telegraph poles from any angle.
+  //  All bevelBox segments into the same accumulator: zero extra draw calls.
+  const segN = Math.max(6, Math.round(span / 2.4));
+  const segW = (span + 1.6) / segN;
+  const pink = new THREE.Color(1.0, 0.16, 0.55);
+  const ice = new THREE.Color(0.92, 0.97, 1.0);
+  for (let i = 0; i < segN; i++) {
+    const x = -((span + 1.6) / 2) + (i + 0.5) * segW;
+    acc.add(bevelBox(segW * 0.94, 0.13, 1.9, 0.03, 1.6), trs(x, height + 1.62, 0, 0), i % 2 ? ice : pink);
+  }
+  for (const s of [-1, 1]) {
+    const x = (s * span) / 2;
+    for (const f of [0.28, 0.52, 0.76]) {
+      acc.add(bevelBox(0.85, 0.34, 0.85, 0.03, 1.4), trs(x, height * f, 0, 0), pink);
+    }
+  }
   const banner = new THREE.PlaneGeometry(span + 1.2, 2.8, 14, 3);
   banner.translate(0, height + 0.78, 0.34);
   bannerUvs(banner);

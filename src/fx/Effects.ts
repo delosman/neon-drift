@@ -2900,7 +2900,11 @@ export class Effects implements System {
     p.mode = PMode.Stretch;
     // Sparks must streak along their own velocity or they read as evenly
     // scattered decorative confetti composited over the scene.
-    p.stretch = 5.2;
+    // 7.5, up from 5.2: at 5.2 a core is still a fat grain, and with the
+    // round halos behind it the shower read as "water spray" to a critic. A
+    // longer, thinner streak is the neon-line read the theme wants; the
+    // area lost to width comes back as length, so legibility holds.
+    p.stretch = 7.5;
     // 0.40, up from 0.30. Life is what buys the ARC: at 0.30 s under -14 m/s²
     // a spark falls 63 cm, which from a chase camera is barely a bend. At
     // 0.40 s it falls 1.1 m and the shower is visibly ballistic — thrown up
@@ -2987,8 +2991,14 @@ export class Effects implements System {
     // colour: the halo is deliberately held under the whitening point so the
     // shower is a coloured cloud with white sparks inside it.
     p.tile = PTile.Glow;
-    p.mode = PMode.Billboard;
-    p.stretch = 0;
+    // Stretched, not billboarded — and this is the "reads as water spray"
+    // fix. A round metre-wide glow disc is the sprite language of a splash
+    // droplet; the same glow elongated along its own velocity is a light
+    // trail. Modest stretch only: the halo still has to carry the tier
+    // colour as a soft silhouette through bloom and motion blur, so it keeps
+    // most of its width and all of its size ramp.
+    p.mode = PMode.Stretch;
+    p.stretch = 2.2;
     p.life = 0.30;
     p.size0 = TIER_FX[tier].halo; p.size1 = 0.10;
     p.count = n * 3;
@@ -3017,6 +3027,12 @@ export class Effects implements System {
     // what a still capture is most likely to catch, and it was the dimmest
     // thing here.
     p.tile = PTile.Glow;
+    // Back to a billboard: the lamp is a steady pool of tier light at the
+    // patch, and stretching it along the kart's own velocity (inherited from
+    // the halo emit above) would smear it into the very splash the halo
+    // change removes.
+    p.mode = PMode.Billboard;
+    p.stretch = 0;
     p.life = 0.12; p.lifeJitter = 0.1;
     p.size0 = 0.78 + 0.28 * tier; p.size1 = 0.52;
     p.gravity = 0; p.drag = 6; p.velJitter = 0; p.posJitter = 0.04;
