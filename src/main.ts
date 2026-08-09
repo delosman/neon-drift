@@ -502,6 +502,25 @@ const CLEAN_LEAK = 30;
 /** The watchdog stays out of the way until the scene has settled. */
 const WATCHDOG_FROM_FRAME = 30;
 
+/**
+ * Per-system CPU attribution, `?debug=systems` only. renderCostEma says the
+ * loop costs ~10 ms on the phone tier and nothing says WHERE — this splits it
+ * by system (update + lateUpdate together) plus the GL submission, as EMAs,
+ * readable via `__sysCost()`. Off by default: the timers themselves are ~30
+ * `performance.now()` calls a frame, which is real money on the tier this
+ * exists to diagnose.
+ */
+const PROFILE_SYSTEMS = /\bsystems\b/.test(new URLSearchParams(location.search).get('debug') || '');
+const sysCost: Record<string, number> = {};
+const sysCostAdd = (k: string, ms: number) => {
+  sysCost[k] = sysCost[k] === undefined ? ms : sysCost[k] + (ms - sysCost[k]) * 0.05;
+};
+(window as any).__sysCost = () => {
+  const out: Record<string, number> = {};
+  for (const k of Object.keys(sysCost).sort((a, b) => sysCost[b] - sysCost[a])) out[k] = +sysCost[k].toFixed(3);
+  return out;
+};
+
 /** EMA of the CPU cost of frames we actually presented, milliseconds. */
 let renderCostEma = 16.7;
 /** EMA of the interval between presented frames — what the player actually sees. */
@@ -745,8 +764,25 @@ function frame(now: number) {
 
   const t0 = performance.now();
 
-  for (const s of systems) s.update?.(ctx, dt);
-  for (const s of systems) s.lateUpdate?.(ctx, dt);
+  if (PROFILE_SYSTEMS) {
+    for (const s of systems) {
+      if (!s.update) continue;
+      const a = performance.now();
+      s.update(ctx, dt);
+      sysCostAdd(s.constructor.name, performance.now() - a);
+    }
+    for (const s of systems) {
+      if (!s.lateUpdate) continue;
+      const a = performance.now();
+      s.lateUpdate(ctx, dt);
+      // Distinct key per phase — folding into the system's update key would
+      // EMA two different quantities into one oscillating number.
+      sysCostAdd(s.constructor.name + '.late', performance.now() - a);
+    }
+  } else {
+    for (const s of systems) s.update?.(ctx, dt);
+    for (const s of systems) s.lateUpdate?.(ctx, dt);
+  }
 
   // The harness is entitled to a present on every frozen frame — retrying a
   // torn capture is the whole reason `__freeze` exists — and so are the first
@@ -763,7 +799,11 @@ function frame(now: number) {
   } else {
     presented = true;
     try {
-      pipeline.render(ctx);
+      if (PROFILE_SYSTEMS) {
+        const a = performance.now();
+        pipeline.render(ctx);
+        sysCostAdd('pipeline.render', performance.now() - a);
+      } else pipeline.render(ctx);
       renderFailures = 0;
       frameWatch.afterPresent(ctx);
       // Scene draws only — the post chain's fullscreen quads always run, so
