@@ -11,6 +11,7 @@
  * ============================================================================
  */
 import * as THREE from 'three';
+import { CC_MUL } from './core/SpeedClass';
 
 // ---------------------------------------------------------------------------
 // Surfaces
@@ -417,7 +418,17 @@ export const SURFACE_PROPS: Record<Surface, SurfaceProps> = {
   [Surface.Water]:    { gripMul: 0.45, dragMul: 4.0, maxSpeedMul: 0.35, rumble: 0.02,  dustColor: new THREE.Color(0xbfe6ff) },
 };
 
-/** metres per second at 100% throttle on road, before stat multipliers */
-export const BASE_TOP_SPEED = 30;
+/**
+ * Metres per second at 100% throttle on road, before stat multipliers.
+ *
+ * Scaled by the session's engine class (50/100/150cc — see core/SpeedClass).
+ * This is a deliberate widening of the contract, made here and nowhere else:
+ * every consumer that reasons about "how fast is fast" (kart caps, the AI's
+ * ceiling, engine pitch, the camera's speed-normalised effects, the HUD dial)
+ * already derives from this one constant, so scaling it HERE is what keeps
+ * the whole game coherent across classes. 100cc resolves to exactly the
+ * number the game was tuned at (30), so nothing changes for the default.
+ */
+export const BASE_TOP_SPEED = 30 * CC_MUL;
 export const LAP_COUNT = 3;
 export const RACER_COUNT = 8;

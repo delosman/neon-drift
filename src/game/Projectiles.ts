@@ -19,6 +19,7 @@
  */
 import * as THREE from 'three';
 import { ItemKind, Quality, Surface, type Ctx, type IKart } from '../types';
+import { CC_MUL } from '../core/SpeedClass';
 import { registerPrewarm } from '../core/Prewarm';
 import type { HazardLike, RacingLine } from './AI';
 
@@ -595,8 +596,12 @@ export function mushroomArt(cap: string, spot: string, S = 128): MatSet {
 // =============================================================================
 
 const SHELL_R = 0.42;
-const GREEN_SPEED = 33;
-const RED_SPEED = 37;
+// Shell speeds ride the engine class. They were tuned as "faster than a kart"
+// (33/37 against a 30 m/s top) — absolute numbers would leave a 150cc field
+// outrunning its own red shells, which quietly deletes the item game at the
+// class where the pack fights hardest.
+const GREEN_SPEED = 33 * CC_MUL;
+const RED_SPEED = 37 * CC_MUL;
 const BOMB_GRAVITY = 21;
 const MAX_BOUNCES = 4;
 const BLAST_RADIUS = 8.2;

@@ -221,7 +221,11 @@ async function advance(seconds, wallMs = 120000) {
 }
 
 const t0 = Date.now();
-await page.goto(`http://127.0.0.1:${PORT}/?quality=${QUALITY}&scale=0.5${TRACK ? `&track=${TRACK}` : ''}`,
+// --cc runs the gate at an engine class (see core/SpeedClass). The 150 class
+// is the one that stresses the AI's corner solving; a new track should be
+// gated at both 100 and 150 before it is trusted.
+const CC = opt('--cc', '');
+await page.goto(`http://127.0.0.1:${PORT}/?quality=${QUALITY}&scale=0.5${TRACK ? `&track=${TRACK}` : ''}${CC ? `&cc=${CC}` : ''}`,
   { waitUntil: 'domcontentloaded', timeout: 90000 });
 await page.waitForFunction('window.__gameReady === true', { timeout: 180000 });
 console.log(`booted in ${((Date.now() - t0) / 1000).toFixed(1)}s  (quality=${QUALITY}, port=${PORT})`);

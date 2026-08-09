@@ -2205,3 +2205,14 @@ html[data-kr-theme='negative'] .kr-flash,
 html[data-kr-theme='negative'] .kr-count-vig {
   filter: grayscale(1);
 }
+
+/* Engine-class picker on the circuit screen. Three chips in a row; the kr-btn
+   grammar carries hover/sel states, this only lays them out and tightens the
+   padding so three fit beside each other on a phone. */
+.kr-cc-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.8em;
+  margin-top: 0.9vmin;
+}
+.kr-btn.kr-cc { padding: 0.30em 1.1em 0.34em; }

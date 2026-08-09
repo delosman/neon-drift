@@ -14,6 +14,7 @@ import { RaceState, type Ctx, type IKart, type KartStats } from '../types';
 import { el, formatClock, ordinalSuffix, cssColor, clamp } from './uiUtil';
 import { ControlsMenu } from './ControlsMenu';
 import { TRACKS, TRACK_ID, TRACK_NAME, TRACK_STORAGE_KEY } from '../world/TrackDefs';
+import { ACTIVE_CC, CC_OPTIONS, type SpeedClass } from '../core/SpeedClass';
 
 export type ScreenName = 'none' | 'title' | 'track' | 'select' | 'pause' | 'results';
 
@@ -179,6 +180,18 @@ export class Menus {
   /** track-select screen state; index into TRACKS */
   private trackSelected = Math.max(0, TRACKS.findIndex((t) => t.id === TRACK_ID));
   private trackCards: HTMLDivElement[] = [];
+  /** Engine class picked on the track screen; applied on confirm. */
+  private ccSelected: SpeedClass = ACTIVE_CC;
+  private ccBtns: HTMLDivElement[] = [];
+  /** previous frame's up/down axis, for edge detection like prevSteer */
+  private prevUd = 0;
+
+  private cycleCc(dir: number) {
+    const i = CC_OPTIONS.indexOf(this.ccSelected);
+    this.ccSelected = CC_OPTIONS[(i + dir + CC_OPTIONS.length) % CC_OPTIONS.length];
+    this.syncCcButtons();
+    this.ui('move');
+  }
   private buttons: { pause: HTMLDivElement[]; results: HTMLDivElement[] } = { pause: [], results: [] };
   private btnIndex = 0;
 
@@ -312,6 +325,17 @@ export class Menus {
     else if (st < -0.55 && this.prevSteer >= -0.55) this.nav(-1);
     this.prevSteer = st;
 
+    // Up/down cycles the engine class on the circuit screen — the chips are
+    // otherwise click-only, and this menu is keyboard-first. `accelAuto` is
+    // excluded or touch's auto-accelerate would hold the picker spinning
+    // through the whole screen.
+    const ud = (input.accelAuto ? 0 : input.accel) - input.brake;
+    if (this.screen === 'track') {
+      if (ud > 0.55 && this.prevUd <= 0.55) this.cycleCc(1);
+      else if (ud < -0.55 && this.prevUd >= -0.55) this.cycleCc(-1);
+    }
+    this.prevUd = ud;
+
     let want: ScreenName;
     if (this.forced) want = this.forced;
     else if (race.state === RaceState.Menu || this.localTitle) want = this.stage;
@@ -443,17 +467,24 @@ export class Menus {
    */
   private confirmTrack() {
     const def = TRACKS[this.trackSelected];
-    if (!def || def.id === TRACK_ID) {
+    const ccChanged = this.ccSelected !== ACTIVE_CC;
+    // Neither choice differs from what this session already baked: walk on.
+    if (!def || (def.id === TRACK_ID && !ccChanged)) {
       this.stage = 'select';
       return;
     }
     try {
       localStorage.setItem(TRACK_STORAGE_KEY, def.id);
+      // The class rides the same reload: BASE_TOP_SPEED is resolved at module
+      // scope (see core/SpeedClass), so a mid-session change would leave the
+      // AI, the shells and the dial disagreeing about what "fast" means.
+      localStorage.setItem('kr.cc', String(this.ccSelected));
       sessionStorage.setItem(JUMP_KEY, 'select');
     } catch { /* privacy mode: the reload still lands on the title */ }
-    // Strip a stale ?track= override so the stored choice wins after reload.
+    // Strip stale ?track= / ?cc= overrides so the stored choices win.
     const url = new URL(location.href);
     url.searchParams.delete('track');
+    url.searchParams.delete('cc');
     location.href = url.toString();
   }
 
@@ -563,10 +594,29 @@ export class Menus {
       this.trackCards.push(c);
     });
     this.syncTrackCards();
+    // Engine class. Lives on the circuit screen because both choices resolve
+    // at module scope and share the same reload-behind-the-curtain mechanism —
+    // one confirm applies both. 100cc is the tuning baseline; 150cc is the
+    // "current speed feels slow" answer.
+    const ccWrap = el('div', 'kr-cc-row kr-stage', inner);
+    this.ccBtns.length = 0;
+    for (const cc of CC_OPTIONS) {
+      const b = el('div', 'kr-btn kr-cc', ccWrap, `${cc}cc`);
+      b.dataset.cc = String(cc);
+      b.onclick = () => { this.ccSelected = cc; this.syncCcButtons(); this.ui('move'); };
+      this.ccBtns.push(b);
+    }
+    this.syncCcButtons();
     const go = el('div', 'kr-menu-list kr-stage', inner);
     const btn = el('div', 'kr-btn sel', go, 'Confirm circuit');
     btn.onclick = () => this.confirmTrack();
     return s;
+  }
+
+  private syncCcButtons() {
+    for (const b of this.ccBtns) {
+      b.classList.toggle('sel', b.dataset.cc === String(this.ccSelected));
+    }
   }
 
   private syncTrackCards() {
