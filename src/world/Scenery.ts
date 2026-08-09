@@ -376,6 +376,10 @@ export class Scenery implements System {
     // After the midground and the backdrop (so it can see what is already in
     // the frame), before the grass: the 8-40 m outside-shoulder guarantee.
     this.dressOutsideShoulder();
+    // Then the 40-90 m band the guarantee deliberately does not own — on the
+    // gridline circuits nothing else claims it, and it is the critics' "the
+    // top half of the frame is featureless slope" dead zone.
+    this.dressGridlineSlopes();
     this.dressShoulders();
     this.dressBankCrest();
     this.dressGrassBand();
@@ -2477,6 +2481,157 @@ export class Scenery implements System {
           if (r < 0.36) this.foliage.pine(_p.clone(), 0.85 + rng() * 0.4, rng() * 6.28, t);
           else if (r < 0.6) this.foliage.cyp(_p.clone(), 1.0 + rng() * 0.5, rng() * 6.28, t);
           else this.foliage.bush(_p.clone(), 1.2 + rng() * 0.9, rng() * 6.28, t, rng() < 0.45);
+        }
+      }
+    });
+  }
+
+  /**
+   * 40–90 m FAR-SLOPE FILLER — gridline circuits only.
+   *
+   * The coastal kit fills its midground with the bespoke section dressers
+   * (harbour, village, beach…); the gridline circuits had nothing between the
+   * 8–40 m outside-shoulder guarantee and the backdrop ridges, and every
+   * critic pass called the result the same way: "the top half of the frame is
+   * featureless slope". This walks the whole lap and drops content into that
+   * band, keyed to what the ground actually is:
+   *
+   *   steep faces — SCREE: clusters of debris boulders in the terrain's own
+   *   neutral tan, so they read as weathering rather than litter;
+   *   sand flats  — dry scrub, tufts and the odd lone boulder;
+   *   grass/dirt  — pine stands and cypress pairs, clumped the way
+   *   dressBankCrest clumps (a line is a hedge; a clump is a landscape);
+   *   every ~6th station — a human waypoint on a workable flat: a tent or
+   *   stall camp with crates, or a marshal post, so the wilderness has scale.
+   *
+   * Every anchor probes the GLOBAL ground (see groundY), respects blocked()
+   * and claim(), and skips the tunnel/bridge spans where "outboard" is bore
+   * rock or open air.
+   */
+  private dressGridlineSlopes() {
+    if (ACTIVE_TRACK.kit !== 'gridline') return;
+    const rng = mulberry32(0x51073e5);
+    const density = clamp(this.ctx.settings.foliageDensity ?? 1, 0.25, 1.5);
+    const inSpan = (t: number, span: readonly [number, number] | null | undefined, pad = 0.015) =>
+      !!span && t > span[0] - pad && t < span[1] + pad;
+    this.walk(0, 1, 30 / density, (t, s, idx) => {
+      if (inSpan(t, ACTIVE_TRACK.tunnel) || inSpan(t, ACTIVE_TRACK.bridge)) return;
+      for (const side of [-1, 1]) {
+        const anchors = 2 + ((this.hash1(idx * 2 + (side > 0 ? 1 : 0), 0x7e11) * 2) | 0);
+        for (let a = 0; a < anchors; a++) {
+          // Reach deepens with the anchor index: the first sits in the 40s
+          // where it frames the road, the last one out past 100 m — a wide
+          // overhead shot sees the MIDDLE of an infield, and a band that
+          // stops at 88 m left exactly that middle bare.
+          const depth = 42 + rng() * 46 + a * 34;
+          const lat = side * (s.halfWidth + depth);
+          if (this.isSea(t, lat, s)) continue;
+          this.at(t, lat, _p, s);
+          this.settle(_p, t, _n);
+          if (_p.y < this.seaLevel + 0.5) continue;
+          if (this.blocked(_p, 6)) continue;
+          const surf = this.surfaceAt(_p, t);
+          if (surf === Surface.Road || surf === Surface.Boost) continue;
+
+          if (_n.y < 0.80) {
+            // Steep: a scree run walking down the face. Boulders shrink as
+            // they go (big ones stop first) — three to six, never a grid.
+            const m = 3 + ((rng() * 4) | 0);
+            for (let k = 0; k < m; k++) {
+              _p2.copy(_p)
+                .addScaledVector(s.binormal, side * (rng() - 0.25) * 8)
+                .addScaledVector(s.tangent, (rng() - 0.5) * 9);
+              this.settle(_p2, t);
+              if (this.blocked(_p2, 1)) continue;
+              this.sets['debris' + ((rng() * 3) | 0)].add(
+                trs(_p2.x, _p2.y, _p2.z, rng() * 6.28, 1.0 + rng() * (2.2 - k * 0.3)),
+                { color: _col.set(0xbfae95).clone(), lod: 260 });
+              this.dropShadow(_p2, 1.0, t, 0.5);
+            }
+          } else if (surf === Surface.Sand) {
+            // Desert floor. Tufts alone vanish from a wide overhead — the
+            // read at distance needs SILHOUETTES, so every sand anchor gets
+            // one big element (boulder group or tall dry bush) and the tufts
+            // are garnish around it.
+            const big = rng();
+            if (big < 0.55) {
+              const bm = 2 + ((rng() * 3) | 0);
+              for (let k = 0; k < bm; k++) {
+                _p2.set(_p.x + (rng() - 0.5) * 7, _p.y, _p.z + (rng() - 0.5) * 7);
+                this.settle(_p2, t);
+                if (this.blocked(_p2, 1)) continue;
+                this.sets['debris' + ((rng() * 3) | 0)].add(
+                  trs(_p2.x, _p2.y, _p2.z, rng() * 6.28, 1.8 + rng() * 2.4),
+                  { color: _col.set(0xc7b49a).clone(), lod: 340 });
+                this.dropShadow(_p2, 1.6, t, 0.55);
+              }
+            } else {
+              this.foliage.bush(_p.clone(), 1.3 + rng() * 1.1, rng() * 6.28, t, true);
+            }
+            const m = 2 + ((rng() * 3) | 0);
+            for (let k = 0; k < m; k++) {
+              _p2.set(_p.x + (rng() - 0.5) * 13, _p.y, _p.z + (rng() - 0.5) * 13);
+              this.settle(_p2, t);
+              if (this.blocked(_p2, 1)) continue;
+              if (rng() < 0.6) this.foliage.tuft(_p2.clone(), 0.9 + rng() * 0.7, rng() * 6.28, true);
+              else this.foliage.bush(_p2.clone(), 0.7 + rng() * 0.7, rng() * 6.28, t, true);
+            }
+          } else {
+            // Grass or dirt: a stand of pines, or a cypress pair for the
+            // vertical accent. Clumped with a deliberate gap rhythm.
+            if (this.hash1(idx * 3 + a, 0x9d31) > 0.72) continue;
+            const m = 2 + ((rng() * 3) | 0);
+            for (let k = 0; k < m; k++) {
+              _p2.set(_p.x + (rng() - 0.5) * 10, _p.y, _p.z + (rng() - 0.5) * 10);
+              this.settle(_p2, t);
+              if (this.blocked(_p2, 1.5)) continue;
+              const r = rng();
+              if (r < 0.5) this.foliage.pine(_p2.clone(), 0.9 + rng() * 0.5, rng() * 6.28, t);
+              else if (r < 0.72) this.foliage.cyp(_p2.clone(), 1.0 + rng() * 0.5, rng() * 6.28, t);
+              else this.foliage.bush(_p2.clone(), 1.0 + rng() * 0.8, rng() * 6.28, t, rng() < 0.5);
+            }
+          }
+        }
+      }
+
+      // The human waypoint. One workable flat every ~6 stations, alternating
+      // sides — a camp reads as "someone walked here", which is the scale cue
+      // a wilderness needs and a scatter pass cannot provide.
+      if (idx % 6 === 3) {
+        const side = (idx / 6) & 1 ? 1 : -1;
+        const lat = side * (s.halfWidth + 34 + rng() * 18);
+        if (this.isSea(t, lat, s)) return;
+        this.at(t, lat, _p, s);
+        this.settle(_p, t, _n);
+        if (_n.y < 0.90 || _p.y < this.seaLevel + 0.5) return;
+        if (this.blocked(_p, 5)) return;
+        if (this.surfaceAt(_p, t) === Surface.Road) return;
+        const inward = Math.atan2(-s.binormal.x * side, -s.binormal.z * side);
+        const r = rng();
+        if (r < 0.45) {
+          const k = idx & 1;
+          this.sets['tent' + k].add(trs(_p.x, _p.y, _p.z, inward + (rng() - 0.5) * 1.2, 1.0 + rng() * 0.35), {
+            uv: new THREE.Vector4(0.25, 0.25, ((rng() * 4) | 0) * 0.25, ((rng() * 4) | 0) * 0.25),
+            lod: 260,
+          });
+          this.dropShadow(_p, 2.6, t, 0.85);
+          this.claim(_p, 3.4);
+          for (let q = 0; q < 2; q++) {
+            _p2.set(_p.x + (rng() - 0.5) * 6, _p.y, _p.z + (rng() - 0.5) * 6);
+            this.settle(_p2, t);
+            this.sets[rng() < 0.5 ? 'barrel' : 'crate'].add(
+              trs(_p2.x, _p2.y, _p2.z, rng() * 6.28, 0.85 + rng() * 0.5),
+              { color: _col.set(0xcdb9a0).clone(), lod: 220 });
+          }
+        } else if (r < 0.8) {
+          const k = idx & 1;
+          const m = trs(_p.x, _p.y, _p.z, inward + (rng() - 0.5) * 0.6);
+          this.sets['stallFrame' + k].add(m, { color: _col.set(0xefe4cf).clone(), uv: new THREE.Vector4(1, 1, 0, 0), lod: 260 });
+          this.sets['stallCanopy' + k].add(m, { uv: new THREE.Vector4(0.25, 0.25, ((rng() * 4) | 0) * 0.25, ((rng() * 4) | 0) * 0.25), lod: 260 });
+          this.dropShadow(_p, 2.2, t, 0.85);
+          this.claim(_p, 3.0);
+        } else {
+          this.marshalPost(t, s, side, rng);
         }
       }
     });
