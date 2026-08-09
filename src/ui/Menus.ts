@@ -533,6 +533,10 @@ export class Menus {
     this.titleHint = el('div', 'kr-hint', wrap);
     const cbtn = el('div', 'kr-btn kr-btn-controls', wrap, 'Controls');
     cbtn.onclick = (e) => { e.stopPropagation(); this.controls.show(); };
+    // Build stamp. Answers "which build am I actually looking at?" at a
+    // glance — a stale browser-cached bundle once burned a whole debugging
+    // session on objects that were already fixed on disk.
+    el('div', 'kr-build', wrap, __BUILD_TAG__);
     this.syncTouchCopy(false);
     return s;
   }

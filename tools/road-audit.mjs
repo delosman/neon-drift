@@ -72,18 +72,38 @@ try {
     // --- every instance of every instanced set -----------------------------
     const m2 = new T.Matrix4(), m = new T.Matrix4(), p = new T.Vector3();
     const out = {};
+    const hit = (k, x, y, z) => {
+      (out[k] ??= { count: 0, samples: [] });
+      out[k].count++;
+      if (out[k].samples.length < 3) out[k].samples.push([x, y, z].map((v) => +v.toFixed(1)));
+    };
+    // Track infrastructure that legitimately IS the corridor, and overhead
+    // spans. Everything else — including the merged static bakes — gets its
+    // VERTICES tested, because merged geometry has no instances to test and
+    // merged geometry is where the last two rounds of offenders hid.
+    const INFRA = /road|kerb|shoulder|wall|guardrail|parapet|tunnel|bridge|terrain|ground|sea|water|sky|cloud|backdrop|verge|shadow|decal|banner|bunting|arch|gantry|start|gate|fx-|trail|minimap/i;
     ctx.scene.traverse((o) => {
-      if (!o.isInstancedMesh || !o.visible) return;
+      if (!o.isMesh || !o.visible || !o.geometry) return;
       o.updateWorldMatrix(true, false);
-      for (let i = 0; i < o.count; i++) {
-        o.getMatrixAt(i, m2);
-        m.multiplyMatrices(o.matrixWorld, m2);
-        p.setFromMatrixPosition(m);
+      if (o.isInstancedMesh) {
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, m2);
+          m.multiplyMatrices(o.matrixWorld, m2);
+          p.setFromMatrixPosition(m);
+          if (!onRoad(p.x, p.y, p.z)) continue;
+          hit(o.name || '(unnamed inst)', p.x, p.y, p.z);
+        }
+        return;
+      }
+      const name = o.name || '(unnamed)';
+      if (INFRA.test(name)) return;
+      const pos = o.geometry.getAttribute('position');
+      if (!pos) return;
+      // every 5th vertex: a 3 m wall face still lands dozens of samples
+      for (let i = 0; i < pos.count; i += 5) {
+        p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
         if (!onRoad(p.x, p.y, p.z)) continue;
-        const k = o.name || '(unnamed)';
-        (out[k] ??= { count: 0, samples: [] });
-        out[k].count++;
-        if (out[k].samples.length < 3) out[k].samples.push([p.x, p.y, p.z].map((v) => +v.toFixed(1)));
+        hit('MESH ' + name, p.x, p.y, p.z);
       }
     });
     return out;

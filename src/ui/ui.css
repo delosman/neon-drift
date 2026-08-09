@@ -2216,3 +2216,12 @@ html[data-kr-theme='negative'] .kr-count-vig {
   margin-top: 0.9vmin;
 }
 .kr-btn.kr-cc { padding: 0.30em 1.1em 0.34em; }
+
+/* Build stamp on the title screen — small, dim, out of the way. */
+.kr-build {
+  margin-top: 1.2vmin;
+  font-size: clamp(8px, 1.1vmin, 12px);
+  letter-spacing: 0.14em;
+  opacity: 0.38;
+  color: #c9b8f0;
+}
