@@ -77,11 +77,17 @@ try {
       out[k].count++;
       if (out[k].samples.length < 3) out[k].samples.push([x, y, z].map((v) => +v.toFixed(1)));
     };
-    // Track infrastructure that legitimately IS the corridor, and overhead
-    // spans. Everything else — including the merged static bakes — gets its
-    // VERTICES tested, because merged geometry has no instances to test and
-    // merged geometry is where the last two rounds of offenders hid.
-    const INFRA = /road|kerb|shoulder|wall|guardrail|parapet|tunnel|bridge|terrain|ground|sea|water|sky|cloud|backdrop|verge|shadow|decal|banner|bunting|arch|gantry|start|gate|fx-|trail|minimap/i;
+    // EXACT infrastructure names, not a loose regex. The first version of
+    // this list excluded /wall/ to skip the track barriers — and thereby
+    // exonerated the merged mesh named 'village-walls', which was carrying
+    // the exact masonry the user kept photographing on the carriageway. An
+    // audit exclusion earns its place by NAMING the mesh it excuses.
+    const INFRA = new Set([
+      'circuit', 'road', 'kerbs', 'markings', 'boost-pads', 'corner-boards',
+      'shoulders', 'terrain', 'track-sea-fallback', 'guardrail',
+      'guardrail-posts', 'tunnel-bore', 'bridge', 'sea-surface', 'Sky',
+      'banner-cloth', 'ropes',
+    ]);
     ctx.scene.traverse((o) => {
       if (!o.isMesh || !o.visible || !o.geometry) return;
       o.updateWorldMatrix(true, false);
@@ -96,7 +102,7 @@ try {
         return;
       }
       const name = o.name || '(unnamed)';
-      if (INFRA.test(name)) return;
+      if (INFRA.has(name) || name.startsWith('fx-') || name.startsWith('track-')) return;
       const pos = o.geometry.getAttribute('position');
       if (!pos) return;
       // every 5th vertex: a 3 m wall face still lands dozens of samples

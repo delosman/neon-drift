@@ -22,6 +22,11 @@ export default defineConfig({
   // from a subpath rather than the domain root.
   base: './',
   define: { __BUILD_TAG__: JSON.stringify(buildTag()) },
-  server: { port: 5173, strictPort: true, host: true },
+  // no-store on BOTH local servers. A browser-cached index.html silently
+  // re-served a week's worth of fixed bugs today — three "it's still broken"
+  // reports against a build that was provably clean on disk. Local serving
+  // never needs HTTP caching; the asset hashes exist for real deployments.
+  server: { port: 5173, strictPort: true, host: true, headers: { 'Cache-Control': 'no-store' } },
+  preview: { headers: { 'Cache-Control': 'no-store' } },
   build: { target: 'es2022', sourcemap: true },
 });
