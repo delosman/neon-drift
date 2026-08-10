@@ -21,6 +21,7 @@ import { Surface } from '../types';
 import { Water, type SeaField } from './Water';
 import { Foliage } from './Foliage';
 import { ACTIVE_TRACK } from './TrackDefs';
+import { EDITOR_ON } from './Removals';
 import { setPlacementGuard } from './Props';
 import {
   GeoAccum,
@@ -854,7 +855,9 @@ export class Scenery implements System {
     const M = this.mats;
     const rng = this.rng;
     const S = (k: string, g: THREE.BufferGeometry, m: THREE.Material) => (this.sets[k] = new InstSet(g, m, k));
-    const A = (k: string) => (this.acc[k] = new GeoAccum());
+    // worldSpace: these accumulators receive world transforms, so they honour
+    // the editor's kill list (see Removals.ts / GeoAccum.worldSpace).
+    const A = (k: string) => (this.acc[k] = new GeoAccum(true));
 
     A('wall');
     A('roof');
@@ -5516,7 +5519,10 @@ export class Scenery implements System {
     // (tools/road-audit.mjs) can see them — the merge bakes positions away,
     // which is exactly how a mis-guarded boulder on the carriageway became
     // invisible to every instrument. Costs draw calls; debugging only.
-    const NO_MERGE = /\bnomerge\b/.test(new URLSearchParams(location.search).get('debug') || '');
+    // The editor also forces no-merge: click-to-delete needs every prop to
+    // stay an individually pickable (and hideable) instance.
+    const NO_MERGE = EDITOR_ON ||
+      /\bnomerge\b/.test(new URLSearchParams(location.search).get('debug') || '');
     if (!NO_MERGE) {
       const { merged, kept } = mergeStaticSets(
         batchable.map((k) => this.sets[k]),

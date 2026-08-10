@@ -17,7 +17,11 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 import { ACTIVE_TRACK } from './TrackDefs';
+import { isRemoved, isRemovedBox, removalCount } from './Removals';
 import { getMaterials } from '../render/Materials';
+
+/** scratch for GeoAccum's kill-list body test */
+const _rbox = new THREE.Box3();
 
 // ---------------------------------------------------------------------------
 // Palette (ART_DIRECTION.md §3) and small math helpers
@@ -2766,8 +2770,25 @@ export class GeoAccum {
   private vcount = 0;
   count = 0;
 
+  /**
+   * `worldSpace: true` for Scenery's accumulators, whose add matrices are
+   * world transforms — those honour the editor's kill list. Geometry
+   * builders (bannerArchGeo etc.) accumulate in LOCAL coordinates where a
+   * position ban would be meaningless; they stay unflagged.
+   */
+  constructor(readonly worldSpace = false) {}
+
   /** `aoFn(localY)` bakes contact darkening at the foot of every wall. */
   add(geo: THREE.BufferGeometry, m: THREE.Matrix4, color?: THREE.Color, aoFn?: (x: number, y: number, z: number) => number, uvOff?: THREE.Vector2) {
+    if (this.worldSpace && removalCount() > 0) {
+      // Body test, not origin test: a wall's origin is at its foot, and the
+      // editor bans the point the user clicked — which is usually the face.
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      if (geo.boundingBox) {
+        _rbox.copy(geo.boundingBox).applyMatrix4(m);
+        if (isRemovedBox(_rbox.min.x, _rbox.min.y, _rbox.min.z, _rbox.max.x, _rbox.max.y, _rbox.max.z)) return;
+      }
+    }
     const p = geo.getAttribute('position') as THREE.BufferAttribute;
     const n = geo.getAttribute('normal') as THREE.BufferAttribute;
     const u = geo.getAttribute('uv') as THREE.BufferAttribute;
@@ -2871,6 +2892,8 @@ export class InstSet {
   }
 
   add(m: THREE.Matrix4, o?: InstOpts) {
+    // The editor's kill list: a banned position never places, any set.
+    if (isRemoved(m.elements[12], m.elements[13], m.elements[14])) return;
     // The road-corridor veto. Position is the matrix translation; a vetoed
     // instance simply never joins the set.
     if (placementGuard) {

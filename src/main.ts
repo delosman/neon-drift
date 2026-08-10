@@ -21,6 +21,8 @@ import { Race } from './game/Race';
 import { ChaseCamera } from './game/Camera';
 import { HUD } from './ui/Hud';
 import { Audio } from './audio/Audio';
+import { initEditor } from './core/Editor';
+import { EDITOR_ON } from './world/Removals';
 
 const parent = document.getElementById('app')!;
 
@@ -1091,6 +1093,8 @@ boot().catch((err) => {
 // harness diagnostic can raycast in-page without bundling its own copy.
 (window as any).__ctx = ctx;
 (window as any).__THREE = THREE;
+// `?editor=1` — the click-to-delete track editor (see core/Editor.ts).
+if (EDITOR_ON) initEditor(ctx);
 // tools/perf.mjs turns this off to measure the un-LODed field for a before/after.
 (window as any).__drawBudget = drawBudget;
 (window as any).__camRig = camera; // TEMP-PROBE

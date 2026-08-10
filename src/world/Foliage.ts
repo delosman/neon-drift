@@ -10,6 +10,7 @@
  * ============================================================================
  */
 import * as THREE from 'three';
+import { isRemoved } from './Removals';
 import {
   GeoAccum,
   InstSet,
@@ -405,6 +406,7 @@ export class Foliage {
    * foreground occluder in the game.
    */
   palm(p: THREE.Vector3, scale: number, yaw: number, t: number, lean = 0, leanDir = 0) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     const phase = rng() * 100;
     const tilt = lean > 0 ? lean : (rng() - 0.5) * 0.13;
@@ -466,6 +468,7 @@ export class Foliage {
 
   /** Mediterranean umbrella pine. */
   pine(p: THREE.Vector3, scale: number, yaw: number, t: number) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     const phase = rng() * 100;
     _euler.set((rng() - 0.5) * 0.08, yaw, (rng() - 0.5) * 0.08, 'YXZ');
@@ -496,6 +499,7 @@ export class Foliage {
 
   /** Cypress spire — the vertical accent through the village. */
   cyp(p: THREE.Vector3, scale: number, yaw: number, t: number) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     const phase = rng() * 100;
     const m = _mat.compose(p, _quat.setFromEuler(_euler.set((rng() - 0.5) * 0.05, yaw, (rng() - 0.5) * 0.05, 'YXZ')), _scl.set(scale * (0.8 + rng() * 0.3), scale, scale * (0.8 + rng() * 0.3))).clone();
@@ -523,6 +527,7 @@ export class Foliage {
   }
 
   bush(p: THREE.Vector3, scale: number, yaw: number, t: number, dry = false) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     this.shrub.add(_mat.compose(p, _quat.setFromEuler(_euler.set(0, yaw, 0, 'YXZ')), _scl.set(scale * (0.85 + rng() * 0.4), scale * (0.8 + rng() * 0.5), scale)).clone(), {
       wind: new THREE.Vector4(rng() * 100, 1.35, 0, 0.55),
@@ -557,6 +562,7 @@ export class Foliage {
    * distinct silver band) and the row spacing, not the anatomy.
    */
   olive(p: THREE.Vector3, scale: number, yaw: number) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     this.shrub.add(
       _mat.compose(p, _quat.setFromEuler(_euler.set(0, yaw, 0, 'YXZ')), _scl.set(scale * (1.0 + rng() * 0.35), scale * (0.78 + rng() * 0.3), scale * (1.0 + rng() * 0.35))).clone(),
@@ -570,6 +576,7 @@ export class Foliage {
 
   /** A vine row segment: wide, low and flat, so a run of them reads as combing. */
   vine(p: THREE.Vector3, scale: number, yaw: number) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     this.shrub.add(_mat.compose(p, _quat.setFromEuler(_euler.set(0, yaw, 0, 'YXZ')), _scl.set(scale * 1.9, scale * 0.55, scale * 0.62)).clone(), {
       wind: new THREE.Vector4(rng() * 100, 1.2, 0, 0.35),
@@ -580,6 +587,7 @@ export class Foliage {
 
   /** A cypress that survives to the backdrop — the midground's vertical accent. */
   cypFar(p: THREE.Vector3, scale: number, yaw: number) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     this.cypress.add(
       _mat.compose(p, _quat.setFromEuler(_euler.set(0, yaw, 0, 'YXZ')), _scl.set(scale * (0.8 + rng() * 0.25), scale, scale * (0.8 + rng() * 0.25))).clone(),
@@ -625,6 +633,7 @@ export class Foliage {
   }
 
   tuft(p: THREE.Vector3, scale: number, yaw: number, beach = false) {
+    if (isRemoved(p.x, p.y, p.z)) return;
     const rng = this.rng;
     const set = beach ? this.marram : this.grass;
     set.add(_mat.compose(p, _quat.setFromEuler(_euler.set(0, yaw, 0, 'YXZ')), _scl.set(scale * (0.8 + rng() * 0.5), scale * (0.7 + rng() * 0.7), scale)).clone(), {
