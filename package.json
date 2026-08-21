@@ -1,14 +1,15 @@
 {
   "name": "neon-drift",
   "version": "1.0.0",
-  "description": "Neon Drift — a synthwave kart racer, forked from Kart Royale.",
+  "description": "Neon Drift \u2014 a synthwave kart racer, forked from Kart Royale.",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node tools/portal-build.mjs",
     "preview": "vite preview",
-    "publish:viverse": "npm run build && viverse-cli app publish dist",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "publish:viverse": "npm run build && viverse-cli app publish dist-portal",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "probe:embed": "node tools/embed-probe.mjs"
   },
   "keywords": [],
   "author": "",
