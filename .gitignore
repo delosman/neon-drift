@@ -8,3 +8,5 @@ shots/
 .DS_Store
 *.local
 .vercel
+dist-portal/
+*.zip
