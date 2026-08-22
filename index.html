@@ -53,6 +53,43 @@
       canvas { display: block; width: 100%; height: 100%; touch-action: none; }
       #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
     </style>
+    <!-- BOOT WATCHDOG. "starting up" is painted before a single module parses,
+         so if the bundle fails to load or throws while evaluating, that text is
+         all the player ever sees — a silent hang with the cause only visible in
+         devtools. That cost a full round-trip with a host that would not serve
+         the asset folder. This turns any such failure into a legible message on
+         the boot screen itself: which URL 404'd, or which error threw. It costs
+         one listener and disarms itself as soon as the game reports progress. -->
+    <script>
+      (function () {
+        var failures = [];
+        var step = function () { return document.querySelector('.boot-step'); };
+        function report(msg) {
+          var el = step();
+          if (!el || window.__bootOk) return;
+          el.innerHTML = '<span style="color:#ff9db0">' + msg + '</span>';
+        }
+        addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+            var u = String(t.src || t.href || '');
+            failures.push(u.slice(u.lastIndexOf('/') + 1) || u);
+            report('could not load ' + failures[failures.length - 1] + ' — the host did not serve this file');
+          } else if (e.message) {
+            report('startup error: ' + String(e.message).slice(0, 120));
+          }
+        }, true);
+        addEventListener('unhandledrejection', function (e) {
+          report('startup error: ' + String((e.reason && e.reason.message) || e.reason).slice(0, 120));
+        });
+        setTimeout(function () {
+          if (window.__bootOk || window.__gameReady) return;
+          report(failures.length
+            ? 'stalled — missing: ' + failures.join(', ')
+            : 'stalled during startup — check the browser console');
+        }, 20000);
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -156,6 +156,9 @@ const SYSTEM_LABELS = [
 ];
 
 function bootProgress(frac: number, label: string) {
+  // Disarms index.html's boot watchdog: the bundle is alive and reporting, so
+  // any later resource error is not "the host never served the game".
+  (window as any).__bootOk = true;
   const bar = document.querySelector<HTMLElement>('.boot-bar i');
   const step = document.querySelector<HTMLElement>('.boot-step');
   if (bar) bar.style.width = `${Math.round(frac * 100)}%`;
